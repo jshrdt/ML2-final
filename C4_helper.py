@@ -9,11 +9,14 @@ import cvlib as cv
 from cvlib.object_detection import draw_bbox
 
 from tqdm import tqdm
+import torch
 
 # C4 helper funcs
 class DataLoader:
-    def __init__(self, data_dir: str):
-        self.train, self.dev, self.test = self._read_files(data_dir)
+    def __init__(self, data_dir: str, split_data: bool = False):
+        self.imgs, self.points = self._read_files(data_dir)
+        if split_data:
+            self.train, self.dev, self.test = self._split()
 
     def _read_files(self, data_dir):
         catfiles, pointfiles = list(), list()
@@ -24,7 +27,10 @@ class DataLoader:
                 elif fname.endswith('cat'):
                     pointfiles.append(os.path.join(root, fname))
 
-        data_df = pd.DataFrame({'imgs': catfiles, 'points': pointfiles})
+        return catfiles, pointfiles
+
+    def _split(self):
+        data_df = pd.DataFrame({'imgs': self.imgs, 'points': self.points})
 
         # Set cutoff points.
         train_len = int(len(data_df)*0.8)
@@ -38,7 +44,7 @@ class DataLoader:
         return train_data, dev_data, test_data
 
     def __len__(self):
-        return len(self.train) + len(self.dev) + len(self.test)
+        return len(self.imgs)
 
 ## sources bbox/grabCut:
 # √ https://github.com/arunponnusamy/cvlib 
@@ -54,16 +60,18 @@ def get_bbox(imgfile: str) -> tuple[np.ndarray, list]:
     Returns:
         tuple[np.NDArray, list]: _description_
     """
-    img = np.array(Image.open(imgfile).resize((500,500)))
+    img = np.array(Image.open(imgfile).resize((250,250)))
     #img = cv2.imread(imgfile)
     #img = cv2.resize(img ,(500,500))
 
+    cuda_status = True if torch.cuda.is_available() else False
+
     # confidence? nms tresh? ? gpu?
     # models:  yolov3, yolov3-tiny, yolov4, yolov4-tiny
-    bbox, label, conf = cv.detect_common_objects(img, model='yolov3') # enable_gpu=True
+    bbox, label, conf = cv.detect_common_objects(img, model='yolov3', enable_gpu=cuda_status)
     output_image = draw_bbox(img, bbox, label, conf)
 
-    return output_image, bbox[0]
+    return output_image, bbox
 
 def grabcut_algorithm(imgfile: str, bounding_box: list) -> np.ndarray:
     """_summary_
@@ -75,7 +83,7 @@ def grabcut_algorithm(imgfile: str, bounding_box: list) -> np.ndarray:
     Returns:
         np.ndarray: _description_
     """
-    img = np.array(Image.open(imgfile).resize((500,500)))
+    img = np.array(Image.open(imgfile).resize((250,250)))
 
     segment = np.zeros(img.shape[:2],np.uint8)
 
@@ -104,17 +112,24 @@ def get_ROIs(data: pd.DataFrame) -> list:
     Returns:
         list: _description_
     """
-    box_fail = 0
+    box_fail, multi_obj = 0, 0
     cut_images = list()
 
-    for imgfile in tqdm(data.train['imgs']):
+    for imgfile in tqdm(data[:100]):
         _, bbox = get_bbox(imgfile)
-        if bbox:
+        ## TBD work with labels and conf thresholds
+        if len(bbox)==1:
             #plt.imshow(img)
-            cut_images.append(grabcut_algorithm(imgfile, bbox))
+            cut_images.append(grabcut_algorithm(imgfile, bbox[0]))
+        elif len(bbox) > 1:
+            #[cut_images.append(grabcut_algorithm(imgfile, bbox_i)) for bbox_i in bbox ]
+            multi_obj+=1
         else:
             box_fail+=1
-    print('failed to grab bbox on {} items.', format(box_fail)) #131
+
+    print('Images excluded:', multi_obj+box_fail)
+    print('Due to object detection failure:', box_fail) #131
+    print('Due to multiple objects found:', multi_obj)
 
     return cut_images
 
