@@ -11,12 +11,18 @@ from cvlib.object_detection import draw_bbox
 from tqdm import tqdm
 import torch
 
+from sklearn.cluster import KMeans
+
+
 # C4 helper funcs
 class DataLoader:
     def __init__(self, data_dir: str, split_data: bool = False):
         self.imgs, self.points = self._read_files(data_dir)
         if split_data:
             self.train, self.dev, self.test = self._split()
+            self.avg_size = self._get_avg_size(self.train['imgs'])
+        else:
+            self.avg_size = self._get_avg_size(self.imgs)
 
     def _read_files(self, data_dir):
         catfiles, pointfiles = list(), list()
@@ -46,21 +52,40 @@ class DataLoader:
     def __len__(self):
         return len(self.imgs)
 
+    def _get_avg_size(self, data: list) -> tuple[int, int]:
+        """Find average size of training files to resize input images to."""
+        # Collect file widths and heights.
+        sizes_w, sizes_h = list(), list()
+        for file in data:
+            size = Image.open(file).size
+            sizes_w.append(size[0])
+            sizes_h.append(size[1])
+        # Get average file size in training dataset.
+        avg_size = (round(sum(sizes_w) / len(data)),
+                    round(sum(sizes_h) / len(data)))
+
+        return avg_size
+
 ## sources bbox/grabCut:
 # √ https://github.com/arunponnusamy/cvlib 
 # √ https://github.com/lihini223/Object-Detection-model/blob/main/objectdetection.ipynb
 # √ https://www.analyticsvidhya.com/blog/2022/03/image-segmentation-using-opencv/, oct 19, 19:59
 
-def get_bbox(imgfile: str) -> tuple[np.ndarray, list]:
+def get_bbox(imgfile: str, size_to: tuple[int, int] = (250,250)) -> tuple[np.ndarray, list]:
     """_summary_
 
     Args:
         imgfile (str): _description_
+        size_to (tuple[int, int], optional): _description_. Defaults to (250,250).
 
     Returns:
-        tuple[np.NDArray, list]: _description_
+        tuple[np.ndarray, list]: _description_
     """
-    img = np.array(Image.open(imgfile).resize((250,250)))
+    if type(imgfile)==str:
+        img = np.copy(np.array(Image.open(imgfile)))
+    else:
+        img = np.copy(imgfile)
+        #np.float32(imgfile)
     #img = cv2.imread(imgfile)
     #img = cv2.resize(img ,(500,500))
 
@@ -68,24 +93,37 @@ def get_bbox(imgfile: str) -> tuple[np.ndarray, list]:
 
     # confidence? nms tresh? ? gpu?
     # models:  yolov3, yolov3-tiny, yolov4, yolov4-tiny
-    bbox, label, conf = cv.detect_common_objects(img, model='yolov3', enable_gpu=cuda_status)
-    output_image = draw_bbox(img, bbox, label, conf)
+    bbox, label, conf = cv.detect_common_objects(img, model='yolov3',
+                                                 enable_gpu=cuda_status)
+    img_copy = np.copy(img)
+    output_image = draw_bbox(img_copy, bbox, label, conf)
 
     return output_image, bbox
 
-def grabcut_algorithm(imgfile: str, bounding_box: list) -> np.ndarray:
+def grabcut_algorithm(img: str, bounding_box: list,
+                      size_to: tuple[int, int] = (250,250)) -> np.ndarray:
     """_summary_
 
     Args:
         imgfile (str): _description_
         bounding_box (list): _description_
+        size_to (tuple[int, int], optional): _description_. Defaults to (250,250).
 
     Returns:
         np.ndarray: _description_
     """
-    img = np.array(Image.open(imgfile).resize((250,250)))
+    # more advanced segmentation based on colour in cv2?
+    #https://www.kaggle.com/code/amulyamanne/image-segmentation-color-clustering/notebook
 
-    segment = np.zeros(img.shape[:2],np.uint8)
+    if type(img)==str:
+        img_arr = np.array(Image.open(img), dtype=np.uint8)
+
+    elif img.dtype == np.float32 or img.dtype == np.float64:
+        img_arr = np.array(img*255, dtype=np.uint8)
+    else:
+        img_arr = img
+
+    segment = np.zeros(img_arr.shape[:2], np.uint8)
 
     x,y,width,height = bounding_box
     segment[y:y+height, x:x+width] = 1
@@ -94,20 +132,20 @@ def grabcut_algorithm(imgfile: str, bounding_box: list) -> np.ndarray:
     foreground_mdl = np.zeros((1,65), np.float64)
 
     # prioritise low iter for speed
-    cv2.grabCut(img, segment, bounding_box, background_mdl,
+    cv2.grabCut(img_arr, segment, bounding_box, background_mdl,
                 foreground_mdl, 2, cv2.GC_INIT_WITH_RECT)
 
     new_mask = np.where((segment==2)|(segment==0),0,1).astype('uint8')
 
-    cut_img = img*new_mask[:,:,np.newaxis]
+    cut_img = img_arr*new_mask[:,:,np.newaxis]
 
     return cut_img
 
-def get_ROIs(data: pd.DataFrame) -> list:
+def get_ROIs(data: DataLoader) -> list:
     """_summary_
 
     Args:
-        data (pd.DataFrame): _description_
+        data (DataLoader): _description_
 
     Returns:
         list: _description_
@@ -115,12 +153,13 @@ def get_ROIs(data: pd.DataFrame) -> list:
     box_fail, multi_obj = 0, 0
     cut_images = list()
 
-    for imgfile in tqdm(data):
-        _, bbox = get_bbox(imgfile)
+    for imgfile in tqdm(data.imgs):
+        _, bbox = get_bbox(imgfile, data.avg_size)
         ## TBD work with labels and conf thresholds
         if len(bbox)==1:
             #plt.imshow(img)
-            cut_images.append(grabcut_algorithm(imgfile, bbox[0]))
+            cut_images.append(grabcut_algorithm(imgfile, bbox[0],
+                                                data.avg_size))
         elif len(bbox) > 1:
             #[cut_images.append(grabcut_algorithm(imgfile, bbox_i)) for bbox_i in bbox ]
             multi_obj+=1
@@ -133,3 +172,20 @@ def get_ROIs(data: pd.DataFrame) -> list:
 
     return cut_images
 
+def get_cluster(ROI_list, n=2):
+    # oct 21, 16:32
+    #https://github.com/beleidy/unsupervised-image-clustering/blob/master/capstone.ipynb
+    ROI_matrix = np.array([img_arr.flatten() for img_arr in ROI_list],
+                          dtype=np.float32)
+    # normalise values
+    ROI_matrix /= 255
+    #flat_ROIs = KMeans.fit_transform(flat_ROIs) ??
+
+    kmeans = KMeans(n_clusters=n, init='k-means++', random_state=0)
+    Y = kmeans.fit_predict(ROI_matrix) #2mins for n=5, 50sec for n=2
+
+    clusters_dict = {cluster_id : list() for cluster_id in set(Y)}
+    for i, cluster_id in enumerate(Y):
+        clusters_dict[cluster_id].append(ROI_list[i])
+
+    return Y, clusters_dict
