@@ -115,7 +115,7 @@ def get_ROIs(data: pd.DataFrame) -> list:
     box_fail, multi_obj = 0, 0
     cut_images = list()
 
-    for imgfile in tqdm(data[:100]):
+    for imgfile in tqdm(data):
         _, bbox = get_bbox(imgfile)
         ## TBD work with labels and conf thresholds
         if len(bbox)==1:
