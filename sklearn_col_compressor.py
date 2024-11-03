@@ -4,17 +4,23 @@
 #
 # License: BSD 3 clause
 
-from time import time
 
-import matplotlib.pyplot as plt
+
+#from time import time
+
+# import matplotlib.pyplot as plt
 import numpy as np
 
 from sklearn.cluster import KMeans
-from sklearn.datasets import load_sample_image
-from sklearn.metrics import pairwise_distances_argmin
+#from sklearn.datasets import load_sample_image
+# from sklearn.metrics import pairwise_distances_argmin
 from sklearn.utils import shuffle
+from sklearn.exceptions import ConvergenceWarning
 
-def compress_colours(img_array, n_colors=64):
+import warnings
+warnings.filterwarnings("error", category=ConvergenceWarning)
+
+def compress_colours(img_array, n_colours=64):
 
     # Convert to floats instead of the default 8 bits integer coding. Dividing by
     # 255 is important so that plt.imshow works well on float data (need to
@@ -28,8 +34,11 @@ def compress_colours(img_array, n_colors=64):
 
     # print("Fitting model on a small sub-sample of the data")
     #t0 = time()
-    image_array_sample = shuffle(image_array, random_state=0, n_samples=1_000)
-    kmeans = KMeans(n_clusters=n_colors, random_state=0).fit(image_array_sample)
+    try:
+        image_array_sample = shuffle(image_array, random_state=0, n_samples=1_000)
+        kmeans = KMeans(n_clusters=n_colours, random_state=0).fit(image_array_sample)
+    except ConvergenceWarning:
+        return 0
     #print(f"done in {time() - t0:0.3f}s.")
 
     # Get labels for all points
@@ -39,8 +48,9 @@ def compress_colours(img_array, n_colors=64):
     #print(f"done in {time() - t0:0.3f}s.")
 
     compressed_img = recreate_image(kmeans.cluster_centers_, labels, w, h)
+    compressed_img_range255 = np.uint8(compressed_img*255)
 
-    # codebook_random = shuffle(image_array, random_state=0, n_samples=n_colors)
+    # codebook_random = shuffle(image_array, random_state=0, n_samples=n_colours)
     # print("Predicting color indices on the full image (random)")
     # t0 = time()
     # labels_random = pairwise_distances_argmin(codebook_random, image_array, axis=0)
@@ -57,7 +67,7 @@ def compress_colours(img_array, n_colors=64):
     # plt.figure(2)
     # plt.clf()
     # plt.axis("off")
-    # plt.title(f"Quantized image ({n_colors} colors, K-Means)")
+    # plt.title(f"Quantized image ({n_colours} colors, K-Means)")
     # plt.imshow(recreate_image(kmeans.cluster_centers_, labels, w, h))
 
     # plt.figure(3)
@@ -67,7 +77,7 @@ def compress_colours(img_array, n_colors=64):
     # plt.imshow(recreate_image(codebook_random, labels_random, w, h))
     # plt.show()
 
-    return compressed_img
+    return compressed_img_range255
 
 def recreate_image(codebook, labels, w, h):
     """Recreate the (compressed) image from the code book & labels"""

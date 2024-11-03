@@ -1,0 +1,7 @@
+{
+    "data_dir": "./cats/",
+    "toy_dir": "./cats/CAT_00",
+    "ROI_nps_file": "CAT_00_1xComp_ROIs.npy",
+    "verbose": "True"
+
+}
