@@ -1,7 +1,7 @@
 {
     "data_dir": "./cats/",
-    "toy_dir": "./cats/CAT_00",
-    "gen_img_ROIs_file": "CAT_00_1xComp_ROIs.npy",
+    "toy_dir": "./cats/CAT_01",
+    "gen_img_ROIs_file": "CAT_01_gen_ROIs.npy",
     "gold_imgs_ref": "./cropped/gold_file_refs.txt", 
     "gold_img_ROIs_file": "./cropped/goldroisCAT00.npy",
     "verbose": "True"

@@ -162,6 +162,44 @@ def get_cropped_ROIs(data: DataLoader, verbose: bool = False,
 
     return img_dict
 
+def create_gold_refs():
+    with open('./cropped/gold_file_refs.txt', 'w') as f:
+        for root, dirs, files in os.walk('./cropped/imgs'):
+            for fname in sorted(files):
+                if fname.endswith('.jpg'):
+                    f.write(f'{fname}\n')
+                    
+def gold_rois_from_imgs():
+    for root, dirs, files in os.walk('./cropped/imgs'):
+        for fname in sorted(files):
+            if fname.endswith('.jpg'):
+                with Image.open('./cropped/imgs/'+fname) as f:
+                    gold_arrs.append(np.array(f))
+
+#### save as img
+# from PIL import Image
+# if not os.path.isdir('./cropped/imgs'):
+#         os.makedirs('./cropped/imgs')
+
+# for i, img_arr in enumerate(img_dict['cropped_imgs']['img_arrs']):
+#     im = Image.fromarray(img_arr)
+#     fname = img_dict['cropped_imgs']['filenames'][i].split('/')[-1]
+#     im.save('./cropped/imgs/' + fname)
+
+
+###
+
+    # if not os.path.isdir('./cropped'):
+    #     os.makedirs('./cropped_dev')
+    # # save devs
+    # np.save('./cropped/' + img_ROIs_file, devs)
+    # np.save('./cropped/' + img_gold_ROIs_files, golds)
+    
+    ## visualise 
+#     import matplotlib.pyplot as plt
+# from PIL import Image
+# plt.imshow(Image.open('./cropped/imgs/'+data.gold_imgs[0].split('/')[-1]))
+
 
 if __name__=='__main__':
     # preprocess cat00, all imgs togehter
@@ -169,7 +207,8 @@ if __name__=='__main__':
     # fetch files
     data = DataLoader(source_dir)
     # preprocess images
-    img_dict = get_cropped_ROIs(data, verbose=config['verbose'], limit=10) 
+    img_dict = get_cropped_ROIs(data, verbose=config['verbose'], limit=False) 
+    # run this far to check processing speed/preprocessing success rate
 
     # filter out gold images
     gold_arrs, gen_arrs = list(), list()
@@ -185,10 +224,10 @@ if __name__=='__main__':
         # if config['gold_img_ROIs_file'] and not os.path.isfile(config['gold_img_ROIs_file']):
         #     np.save(config['gold_img_ROIs_file'], gold_arrs)
     else:
-        gen_arrs = img_dict['cropped_imgs'].values()
+        gen_arrs = list(img_dict['cropped_imgs'].values())
 
     print(len(gen_arrs), len(gold_arrs))
 
     # save (general) iamge rois as numpy matrix
-    # if config['gen_img_ROIs_file']:
-    #     np.save(config['gen_img_ROIs_file'], gen_arrs)
+    if config['gen_img_ROIs_file']:
+        np.save('./cropped/'+config['gen_img_ROIs_file'], gen_arrs)
