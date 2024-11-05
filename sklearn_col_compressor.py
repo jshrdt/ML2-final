@@ -4,8 +4,6 @@
 #
 # License: BSD 3 clause
 
-
-
 #from time import time
 
 # import matplotlib.pyplot as plt
@@ -81,4 +79,8 @@ def compress_colours(img_array, n_colours=64):
 
 def recreate_image(codebook, labels, w, h):
     """Recreate the (compressed) image from the code book & labels"""
-    return codebook[labels].reshape(w, h, -1) 
+    return codebook[labels].reshape(w, h, -1)
+
+if __name__=='__main__':
+    # Train/for KMeans for colour compression
+    # load in gold files 

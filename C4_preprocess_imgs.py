@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 
 from PIL import Image
 import numpy as np
@@ -16,10 +17,18 @@ from C4_helper import DataLoader
 parser = argparse.ArgumentParser()
 parser.add_argument('-c', '--config', help='configuration file',
                     default='config.json')
+parser.add_argument('-srcdir', '--source_directory',
+                    help='directory to run preprocessing on',
+                    default=False)
+parser.add_argument('-lim', '--limit',
+                    help='limit number of images used from dir for code testing',
+                    default=False)
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
 verbose = True if config['verbose'] == 'True' else False
+source_dir = args.source_directory if args.source_directory else config['toy_dir']
+
 
 ## sources bbox/grabCut:
 # √ https://github.com/arunponnusamy/cvlib 
@@ -108,21 +117,21 @@ def grabcut_algorithm(img: str, bounding_box: list, iterations: int = 2) \
 
 
 def get_cropped_ROIs(data: DataLoader, verbose: bool = False,
-                     toy: bool = False) -> dict:
+                     limit: bool = False) -> dict:
     """Read and resize images, run object detetion and judge suitablility
     of image for further use. If suitable, use bounding box to run grabCut
     algorithm and return dict of image ROIs and pruned images."""
     print('Preprocessing images...')
 
     size_to = (int(data.avg_size[0]/2), int(data.avg_size[1]/2))
-    data = data.imgs[1200:] if toy else data.imgs
+    data_imgs = data.imgfiles[:limit] if limit else data.imgfiles
 
     # compressed_ROIs = list()
-    img_dict = {'cropped_imgs': {'img_arrs': list(), 'filenames': list()},
+    img_dict = {'cropped_imgs': {},
                 'detect_fail': list(),
                 'multi_obj': list()}
 
-    for imgfile in tqdm(data):
+    for imgfile in tqdm(data_imgs):
         # Read and resize image to half its size to improve runtime
         with Image.open(imgfile) as f:
             img = np.array(f.resize(size_to))
@@ -132,8 +141,9 @@ def get_cropped_ROIs(data: DataLoader, verbose: bool = False,
         ## TBD work with labels and conf thresholds?
         if use_img:
             cut_image = grabcut_algorithm(img, bbox[0])
-            img_dict['cropped_imgs']['img_arrs'].append(cut_image)
-            img_dict['cropped_imgs']['filenames'].append(imgfile)
+            img_dict['cropped_imgs'][imgfile] = cut_image
+            #img_dict['cropped_imgs']['filenames'].append(imgfile)
+
         else:
             if len(bbox) > 1:
                 # Failure, more than 1 cat
@@ -147,13 +157,38 @@ def get_cropped_ROIs(data: DataLoader, verbose: bool = False,
                                    + len(img_dict['multi_obj'])))
         print('Due to object detection failure:', len(img_dict['detect_fail'])) #131
         print('Due to multiple objects found:', len(img_dict['multi_obj']))
+        print(f'Cropped image-ROIs returned from {data.data_dir} :',
+              len(img_dict['cropped_imgs']))
 
     return img_dict
 
 
 if __name__=='__main__':
-    data = DataLoader(config['toy_dir'])
-    img_dict = get_cropped_ROIs( data, verbose=config['verbose'], toy=False)
- 
-    if config['ROI_nps_file']:
-        np.save(config['ROI_nps_file'], img_dict['cropped_imgs']['img_arrs'])
+    # preprocess cat00, all imgs togehter
+    # then sort into gold/normal, and save as 2 numpy files
+    # fetch files
+    data = DataLoader(source_dir)
+    # preprocess images
+    img_dict = get_cropped_ROIs(data, verbose=config['verbose'], limit=10) 
+
+    # filter out gold images
+    gold_arrs, gen_arrs = list(), list()
+    if 'CAT_00' in source_dir:
+        with open('./cropped/gold_file_refs.txt', 'r') as f:
+            gold_file_refs = f.read().split()
+        for fname, img_arr in img_dict['cropped_imgs'].items():
+            if fname.split('/')[-1] in gold_file_refs:
+                gold_arrs.append(img_arr)
+            else:
+                gen_arrs.append(img_arr)
+
+        # if config['gold_img_ROIs_file'] and not os.path.isfile(config['gold_img_ROIs_file']):
+        #     np.save(config['gold_img_ROIs_file'], gold_arrs)
+    else:
+        gen_arrs = img_dict['cropped_imgs'].values()
+
+    print(len(gen_arrs), len(gold_arrs))
+
+    # save (general) iamge rois as numpy matrix
+    # if config['gen_img_ROIs_file']:
+    #     np.save(config['gen_img_ROIs_file'], gen_arrs)
