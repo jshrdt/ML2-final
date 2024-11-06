@@ -46,7 +46,7 @@ def format_arr(img_array):
     # 255 is important so that plt.imshow works well on float data (need to
     # be in the range [0-1])
 
-    arr_norm = np.array(img_array, dtype=np.float64) / 255
+    arr_norm = np.array(img_array, dtype=np.uint8)
     # Load Image and transform to a 2D numpy array.
 
     w, h, d = tuple(arr_norm.shape)
@@ -56,11 +56,16 @@ def format_arr(img_array):
     return arr_norm, w, h, d
 
 
-def train_col_compressor(img_matrix, n_colours=64, modelfile=None):
+def train_col_compressor(img_matrix, n_colours=65, modelfile=None):
+    print('Formatting data...')
     img_matrix_norm, w, h, d = format_arr(img_matrix)
+    # img_matrix_norm = np.array([pix for pix in img_matrix_norm
+    #                             if sum(pix)>0]) #takes too long
+
     # print("Fitting model on a small sub-sample of the data")
     #t0 = time()
     try:
+        print('Fitting model...')
         image_matrix_sample = shuffle(img_matrix_norm, random_state=0,
                                       n_samples=1_000)
         kmeans_model = KMeans(n_clusters=n_colours,
@@ -72,8 +77,8 @@ def train_col_compressor(img_matrix, n_colours=64, modelfile=None):
         # save model
         pickle.dump(kmeans_model, open(modelfile, "wb"))
         
-    img_matrix_norm = np.uint8(img_matrix_norm*255)  ## return to normal format
-        
+    #img_matrix_norm = np.uint8(img_matrix_norm*255)  ## return to normal format
+
     return kmeans_model
 
 # # load model
@@ -82,7 +87,7 @@ def train_col_compressor(img_matrix, n_colours=64, modelfile=None):
     
 
 
-def compress_colours(model, img_array, n_colours=64):
+def compress_colours(model: KMeans, img_array: np.ndarray):
 
     image_array, w, h, d = format_arr(img_array)
 
@@ -93,7 +98,7 @@ def compress_colours(model, img_array, n_colours=64):
     #print(f"done in {time() - t0:0.3f}s.")
 
     compressed_img = recreate_image(model.cluster_centers_, labels, w, h)
-    compressed_img_range255 = np.uint8(compressed_img*255)
+    #compressed_img_range255 = np.uint8(compressed_img*255)
 
     # codebook_random = shuffle(image_array, random_state=0, n_samples=n_colours)
     # print("Predicting color indices on the full image (random)")
@@ -122,11 +127,24 @@ def compress_colours(model, img_array, n_colours=64):
     # plt.imshow(recreate_image(codebook_random, labels_random, w, h))
     # plt.show()
 
-    return compressed_img_range255
+    return compressed_img
 
 def recreate_image(codebook, labels, w, h):
     """Recreate the (compressed) image from the code book & labels"""
     return codebook[labels].reshape(w, h, -1)
+
+def get_colour_embedding(model: KMeans, img_arr: np.ndarray):
+    compressed_roi = np.uint8(compress_colours(model, img_arr))
+    gold_palette = np.array([np.uint8(col) for col in model.cluster_centers_
+                         if sum(np.uint8(col)>0)])
+    c_embedding = {tuple(colour): 0  for colour in list(gold_palette)}
+    for x in compressed_roi:
+        for colour in x:
+            if sum(colour) >0:
+                c_embedding[tuple(colour)] = c_embedding.get(tuple(colour), 0)+1
+            
+    return c_embedding
+    
 
 # def compress_colours(img_array, n_colours=64):
 

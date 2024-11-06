@@ -170,11 +170,13 @@ def create_gold_refs():
                     f.write(f'{fname}\n')
                     
 def gold_rois_from_imgs():
+    gold_arrs = list()
     for root, dirs, files in os.walk('./cropped/imgs'):
         for fname in sorted(files):
             if fname.endswith('.jpg'):
                 with Image.open('./cropped/imgs/'+fname) as f:
                     gold_arrs.append(np.array(f))
+    return gold_arrs
 
 #### save as img
 # from PIL import Image
