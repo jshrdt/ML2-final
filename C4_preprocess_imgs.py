@@ -230,6 +230,6 @@ if __name__=='__main__':
 
     print(len(gen_arrs), len(gold_arrs))
 
-    # save (general) iamge rois as numpy matrix
+    # save (general) image rois as numpy matrix
     if config['gen_img_ROIs_file']:
         np.save('./cropped/'+config['gen_img_ROIs_file'], gen_arrs)

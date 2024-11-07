@@ -4,6 +4,21 @@ Dataset: https://www.kaggle.com/datasets/crawford/cat-dataset/data, Oct 9 2024, 
 
 "super small projects"
 
+
+####
+Run preprocess: imgdir -> ROI nps
+
+1 train col compressor & save model
+2 col compress ROIs (?get col profiles)
+
+1 Train kmeans colour clustering (input col profiles, handles vectorisation)
+2 apply clustering 
+
+Question of. Eval
+
+
+? Write main exec script that reads gold+gen np data and then fit+compress+fit+clusters?
+
 ### File descriptions:
 
 C4 preprocess images: 

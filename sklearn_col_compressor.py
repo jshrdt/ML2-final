@@ -55,7 +55,7 @@ def format_arr(img_array):
 
     return arr_norm, w, h, d
 
-
+### train ###
 def train_col_compressor(img_matrix, n_colours=65, modelfile=None):
     print('Formatting data...')
     img_matrix_norm, w, h, d = format_arr(img_matrix)
@@ -73,21 +73,17 @@ def train_col_compressor(img_matrix, n_colours=65, modelfile=None):
     except ConvergenceWarning:
         return 0
     
-    if modelfile: 
-        # save model
-        pickle.dump(kmeans_model, open(modelfile, "wb"))
-        
     #img_matrix_norm = np.uint8(img_matrix_norm*255)  ## return to normal format
 
     return kmeans_model
 
-# # load model
+# # load model ## move to? apply or cluster script(!)
 # loaded_model = pickle.load(open(modelfile, "rb"))
     ## save/return model
     
-
-
+### apply ###
 def compress_colours(model: KMeans, img_array: np.ndarray):
+    # if model arg is string, load, else assume its returned model
 
     image_array, w, h, d = format_arr(img_array)
 
@@ -129,22 +125,38 @@ def compress_colours(model: KMeans, img_array: np.ndarray):
 
     return compressed_img
 
-def recreate_image(codebook, labels, w, h):
+def recreate_image(codebook, labels, w, h): # imported from source
     """Recreate the (compressed) image from the code book & labels"""
     return codebook[labels].reshape(w, h, -1)
 
-def get_colour_embedding(model: KMeans, img_arr: np.ndarray):
+
+
+### move files
+def get_colour_profile(model: KMeans, img_arr: np.ndarray):
     compressed_roi = np.uint8(compress_colours(model, img_arr))
-    gold_palette = np.array([np.uint8(col) for col in model.cluster_centers_
-                         if sum(np.uint8(col)>0)])
-    c_embedding = {tuple(colour): 0  for colour in list(gold_palette)}
+
+    c_profile = {tuple(np.uint8(colour)): 0 
+                   for colour in list(model.cluster_centers_)
+                   if sum(np.uint8(colour)>0)}
+
     for x in compressed_roi:
         for colour in x:
             if sum(colour) >0:
-                c_embedding[tuple(colour)] = c_embedding.get(tuple(colour), 0)+1
-            
-    return c_embedding
-    
+                c_profile[tuple(colour)] = c_profile.get(tuple(colour), 0)+1
+
+    c_profile_norm = {col: count/sum(c_profile.values())
+                        for col, count in c_profile.items()}
+
+    return c_profile_norm
+
+
+def plot_colour_profile(c_embed):
+    img_col_df = pd.DataFrame(c_embed.items(), columns=['colours', 'count'], index = ['#%02x%02x%02x' % col for col in c_embed.keys()])
+    img_col_df = img_col_df.drop(img_col_df[img_col_df['count'] == 0].index)
+    mycols = ['#%02x%02x%02x' % col for col in img_col_df['colours']]
+    axes = img_col_df.plot.barh(color={"count": mycols})
+    plt.show()
+####
 
 # def compress_colours(img_array, n_colours=64):
 
@@ -214,3 +226,12 @@ if __name__=='__main__':
     # load in gold files
     gold_rois = np.load(config['gold_img_ROIs_file'])
     print(len(gold_rois))
+    step = int(len(gold_rois)**0.5+len(gold_rois)**0.1)
+    gold_matrix = np.concatenate([np.concatenate(gold_rois[i-step:i], axis=0)
+                                  for i in range(step, len(gold_rois), step)],
+                                 axis=1)
+    kmeans_model = train_col_compressor(gold_matrix, n_colours=65,
+                                        modelfile=config['compressor_modelfile'])
+
+    # now switch scripts to keep amin funcs clean, this one is just
+    # fir training ü saving col compress model
