@@ -2,6 +2,7 @@
 import os
 from PIL import Image
 from tqdm import tqdm
+import numpy as np
 
 class DataLoader:
     def __init__(self, data_dir: str, split_data: bool = False):
@@ -62,6 +63,16 @@ class DataLoader:
                     round(sum(sizes_h) / len(self.imgfiles)))
 
         return avg_size
+
+def concat_imgs(img_arrays: list) -> np.ndarray:
+    """Concat list of image arrays to matrix to facilitate fitting/plots."""
+    step = int(len(img_arrays)**0.5+len(img_arrays)**0.2)
+    img_matrix = np.concatenate([np.concatenate(img_arrays[i-step:i], axis=0)
+                                 for i in range(step, len(img_arrays), step)],
+                                axis=1)
+    return img_matrix
+
+
 if __name__=='__main__':
     pass
     #data = DataLoader("./cats/", split_data=True)

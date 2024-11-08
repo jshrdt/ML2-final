@@ -1,11 +1,16 @@
 {
     "data_dir": "./cats/",
-    "toy_dir": "./cats/CAT_00",
-    "gen_img_ROIs_file": "CAT_01_gen_ROIs.npy",
-    "gold_imgs_ref": "./cropped/gold_file_refs.txt", 
-    "gold_img_ROIs_file": "./cropped/goldroisCAT00.npy",
+    "toy_dir": "./cats/CAT_06",
+    "gen_ROIs": "./cropped/genrois06.npy",
+    "gold_imgs_ref": "./cropped/gold_file_refs.txt",
+
+    "devrois": "./cropped/devroisCAT00.npy",
+    "gold_ROIs": "./cropped/goldroisCAT00.npy",
     "verbose": "True",
     "compressor_modelfile": "kmeans00.pickle",
-    "gold_embeds":  "gold_colour_embeds.npy",
-    "dev_embeds": "dev_colour_embeds.npy"
+
+    "gold_embeds":  "./cropped/gold_colour_embeds.npy",
+    "dev_embeds": "./cropped/dev_colour_embeds.npy",
+    "gen_embeds": "./cropped/gen_embeds06.npy"
+
 }
