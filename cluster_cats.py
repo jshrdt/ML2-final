@@ -52,3 +52,7 @@ def vis_cluster(cluster, n_items=21):
             axis[i-int(clen/3*2)][2].imshow(img, interpolation='nearest')
 
     plt.show()
+    
+if __name__=='__main__':
+    #! throw out (0,0,0) colour
+    pass
