@@ -16,6 +16,7 @@ Run preprocess: imgdir -> ROI nps
 
 Question of. Eval
 
+? Save profiles as json
 
 ? Write main exec script that reads gold+gen np data and then fit+compress+fit+clusters?
 

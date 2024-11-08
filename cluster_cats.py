@@ -20,11 +20,6 @@ import matplotlib.pyplot as plt
 
 #     return Y, clusters_dict
 
-def vectorize_colours(colour_profile):
-    # ? refactor for matrices?
-    # then just fake dims if len=1
-    col_embedding = np.array([col for col in colour_profile.values()])
-    return col_embedding
 
 
 # TBD train cluster KMEANS vs test ##
