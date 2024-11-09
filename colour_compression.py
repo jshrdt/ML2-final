@@ -43,17 +43,17 @@ parser.add_argument('-s', '--save', help='create & save colour embeddings',
 parser.add_argument('-lim', '--limit', help='limit number of images used',
                     default=0)
 
-args_comp, unk = parser.parse_known_args()
-config = json.load(open(args_comp.config))
+args, unk = parser.parse_known_args()
+config = json.load(open(args.config))
 
 MODELFILE = config['compressor_modelfile']
-N_COLOURS = int(args_comp.n_colours)
-LIMIT = int(args_comp.limit) if args_comp.limit != "False" else False
+N_COLOURS = int(args.n_colours)
+LIMIT = int(args.limit) if args.limit != "False" else False
 
 def get_model(modelfile=None) -> KMeans:
     """High-level function to load/fit model for KMeans colour compression."""
     # Try loading model from file...
-    if modelfile and os.path.isfile(modelfile) and args_comp.train_new==False:
+    if modelfile and os.path.isfile(modelfile) and args.train_new==False:
         # Load model for colour compression
         model = pickle.load(open(MODELFILE, "rb"))
     else:
@@ -63,7 +63,7 @@ def get_model(modelfile=None) -> KMeans:
         model = train_compressor(gold_rois, colours=N_COLOURS,
                                  modelfile=modelfile)
         # optional: get and save gold embeds created; needed for clustering.
-        if args_comp.save or os.path.isfile(config['gold_embeds'])==False:
+        if args.save or os.path.isfile(config['gold_embeds'])==False:
              # Get colour profiles & transform to colour embedding vectors
             _, gold_profiles = get_colour_profile(model, gold_rois)
             gold_c_embeds = vectorize_colours(gold_profiles)
@@ -116,7 +116,7 @@ def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
         return 0
 
     # Save model to file.
-    if (modelfile and os.path.isfile(modelfile)==False) or args_comp.train_new:
+    if (modelfile and os.path.isfile(modelfile)==False) or args.train_new:
         raise ValueError('shoudl not save')
         save_kmeans_model(model, modelfile)
 
@@ -251,23 +251,15 @@ def plot_example(model: KMeans, roi: np.ndarray):
     plt.show()
 
 
-def get_colour_embeddings(test_rois: np.ndarray, test_embeds_file: str = None,
-                        save: bool = False) -> list[np.ndarray]:
+def get_colour_embeddings(test_rois: np.ndarray, save: bool = False) -> list[np.ndarray]:
     """High level function, load/fit KMeans model for colour compression,
     load image ROIs from test data, transform and return their colour
     embeddings. Optionally save embeddings to file.
 
     Args:
-        test_roi_file (str): Cropped test image ROI arrays.
-        test_embeds_file (str, optional): Filename to save colour embeddings
-            of test ROIs to. Defaults to None.
-        limit (int | bool, optional): Limit amounts of test image ROIs to
-            apply script to. Defaults to False.
+        test_rois (np.ndarray): _description_
         save (bool, optional): Set whether to save colour embeddings to
             file. Defaults to False.
-
-    Raises:
-        FileNotFoundError: _description_
 
     Returns:
         list[np.ndarray]: _description_
@@ -287,15 +279,15 @@ def get_colour_embeddings(test_rois: np.ndarray, test_embeds_file: str = None,
     colour_embeddings = vectorize_colours(colour_profiles)
 
     # optional: save embeds to numpy file
-    if test_embeds_file and save:
-        np.save(test_embeds_file, colour_embeddings)
-        print('Colour embeddings saved to', test_embeds_file)
+    if config['gen_embeds'] and save:
+        np.save(config['gen_embeds'], colour_embeddings)
+        print('Colour embeddings saved to', config['gen_embeds'])
 
     return colour_embeddings
 
 
 if __name__=='__main__':
-    if args_comp.example:
+    if args.example:
         # run code on only one random image from test rois to plot: 
         # 1.1) test image ROI, 1.2) test image ROI post colour compression,
         # 1.3) colour palette of model, 2) test image colour profile graph.
@@ -317,7 +309,6 @@ if __name__=='__main__':
         # to config embeds file.
         if LIMIT: test_rois = test_rois[:LIMIT]
 
-        col_embeds = get_colour_embeddings(test_rois, config['gen_embeds'],
-                                           args_comp.save)
+        col_embeds = get_colour_embeddings(test_rois, args.save)
     print('\n--- done ---')
 

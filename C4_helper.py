@@ -9,7 +9,7 @@ class DataLoader:
     def __init__(self, data_dir: str, split_data: bool = False):
         self.data_dir = data_dir
         self.imgfiles = self._fetch_files(data_dir)
-        self.avg_size = (321, 275)#self._get_avg_size()
+        #self.avg_size = (321, 275) #self._get_avg_size()
 
         if split_data:
             self.train, self.test = self._split()
@@ -50,20 +50,20 @@ class DataLoader:
     def __len__(self):
         return len(self.imgfiles)
 
-    def _get_avg_size(self) -> tuple[int, int]:
-        """Find average size of training files to resize input images to."""
-        # Collect file widths and heights.
-        sizes_w, sizes_h = list(), list()
-        for file in self.imgfiles:
-            with Image.open(file) as img:
-                size = img.size
-                sizes_w.append(size[0])
-                sizes_h.append(size[1])
-        # Get average file size in training dataset.
-        avg_size = (round(sum(sizes_w) / len(self.imgfiles)),
-                    round(sum(sizes_h) / len(self.imgfiles)))
+def get_avg_size(files) -> tuple[int, int]:
+    """Find average size of training files to resize input images to."""
+    # Collect file widths and heights.
+    sizes_w, sizes_h = list(), list()
+    for file in files:
+        with Image.open(file) as img:
+            size = img.size
+            sizes_w.append(size[0])
+            sizes_h.append(size[1])
+    # Get average file size in training dataset.
+    avg_size = (round(sum(sizes_w) / len(files)),
+                round(sum(sizes_h) / len(files)))
 
-        return avg_size
+    return avg_size
 
 def concat_imgs(img_arrays: list) -> np.ndarray:
     """Concat list of image arrays to matrix to facilitate fitting/plots."""
