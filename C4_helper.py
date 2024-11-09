@@ -3,6 +3,7 @@ import os
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
+import pickle
 
 class DataLoader:
     def __init__(self, data_dir: str, split_data: bool = False):
@@ -72,6 +73,12 @@ def concat_imgs(img_arrays: list) -> np.ndarray:
                                 axis=1)
     return img_matrix
 
+def save_kmeans_model(model, modelfile=None):
+    if modelfile:
+        pickle.dump(model, open(modelfile, "wb"))
+        print('Model saved to', modelfile)
+    else:
+        print('No modelfile to save to specified.')
 
 if __name__=='__main__':
     pass

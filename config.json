@@ -9,6 +9,8 @@
     "verbose": "True",
 
     "compressor_modelfile": "kmeans00.pickle",
+    "cluster_modelfile": "kmeans01.pickle",
+
 
     "gold_embeds":  "./cropped/gold_colour_embeds.npy",
     "dev_embeds": "./cropped/dev_colour_embeds.npy",

@@ -24,7 +24,7 @@ from collections import Counter
 import random 
 from tqdm import tqdm
 import os
-from C4_helper import concat_imgs
+from C4_helper import concat_imgs, save_kmeans_model
 
 warnings.filterwarnings("error", category=ConvergenceWarning)
 
@@ -49,19 +49,18 @@ config = json.load(open(args.config))
 MODELFILE = config['compressor_modelfile']
 N_COLOURS = int(args.n_colours)
 
-def get_model() -> KMeans:
+def get_model(modelfile=None) -> KMeans:
     """High-level function to load/fit model for KMeans colour compression."""
     # Try loading model from file...
-    if os.path.isfile(MODELFILE) and args.train_new==False:
+    if modelfile and os.path.isfile(modelfile) and args.train_new==False:
         # Load model for colour compression
         model = pickle.load(open(MODELFILE, "rb"))
     else:
         # or fit a new model.
-        print('Training new model...')
         # Load data for fitting & fit model; save model if modelfile passed.
-        gold_rois = np.load(config['gold_img_ROIs_file'])
+        gold_rois = np.load(config['gold_ROIs'])
         model = train_compressor(gold_rois, colours=N_COLOURS,
-                                 modelfile=MODELFILE)
+                                 modelfile=modelfile)
         # optional: get and save gold embeds created; needed for clustering.
         if args.save or os.path.isfile(config['gold_embeds'])==False:
              # Get colour profiles & transform to colour embedding vectors
@@ -116,11 +115,8 @@ def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
         return 0
 
     # Save model to file.
-    if modelfile:
-        pickle.dump(model, open(modelfile, "wb"))
-        print('Model saved to', modelfile)
-    else:
-        print('No modelfile to save to specified.')
+    if (modelfile and os.path.isfile(modelfile)==False) or args.train_new:
+        save_kmeans_model(model, modelfile)
 
     return model
 
@@ -167,7 +163,6 @@ def get_colour_profile(model: KMeans, compressed_rois: list[np.ndarray]) \
     print('Creating colour profiles...')
     # Get corresponding colour profiles for each image:
     # dict of colour centroid: absolute frequency.
-    print(type(compressed_rois[0]), len(compressed_rois[0]))
     col_profiles = [Counter(tuple(map(tuple, roi))) for roi in tqdm(compressed_rois)]
 
     # Add in colours from centroid lists that were not found in image and
@@ -252,8 +247,6 @@ def plot_example(model: KMeans, roi: np.ndarray):
 
     plt.show()
 
-    print('--- end ---')
-
 
 def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
                           limit: int|bool = False, save: bool = False) \
@@ -279,7 +272,7 @@ def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
     """
     # Get model (try to load from config file, else try to fit new model
     # with gold_ROIs)
-    kmeans_model = get_model()
+    kmeans_model = get_model(MODELFILE)
 
     # Load pre-processed (cropped) test image rois.
     if os.path.isfile(test_roi_file):
@@ -302,7 +295,7 @@ def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
 
     # optional: save embeds to numpy file
     if test_embeds_file and save:
-        np.save(test_embeds_file, colour_embeds)
+        np.save(test_embeds_file, colour_embeddings)
         print('Colour embeddings saved to', test_embeds_file)
 
     return colour_embeddings
@@ -313,7 +306,7 @@ if __name__=='__main__':
         # run code on only one random image from test rois to plot: 
         # 1.1) test image ROI, 1.2) test image ROI post colour compression,
         # 1.3) colour palette of model, 2) test image colour profile graph.
-        kmeans_model = get_model()
+        kmeans_model = get_model(MODELFILE)
         if os.path.isfile(config['gen_ROIs']):
             gen_rois = np.load(config['gen_ROIs'])
             test_roi = gen_rois[random.randint(0, len(gen_rois)-1)]
@@ -322,9 +315,8 @@ if __name__=='__main__':
     else:
         # Create colour embeddings from config npy file; if --save: save
         # to config embeds file.
-        colour_embeds = get_colour_embeddings(config['gen_ROIs'],
-                                              config['gen_embeds'],
-                                              int(args.limit),
-                                              args.save)
+        col_embeds = get_colour_embeddings(config['gen_ROIs'],
+                                           config['gen_embeds'], int(args.limit),
+                                           args.save)
     print('\n--- done ---')
 
