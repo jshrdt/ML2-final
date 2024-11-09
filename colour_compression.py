@@ -30,7 +30,7 @@ warnings.filterwarnings("error", category=ConvergenceWarning)
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', help='configuration file',
+parser.add_argument('-conf', '--config', help='configuration file',
                     default='config.json')
 parser.add_argument('-new', '--train_new', help='force new training+saving of model',
                     action='store_true', default=False)
@@ -43,16 +43,17 @@ parser.add_argument('-s', '--save', help='create & save colour embeddings',
 parser.add_argument('-lim', '--limit', help='limit number of images used',
                     default=0)
 
-args, unk = parser.parse_known_args()
-config = json.load(open(args.config))
+args_comp, unk = parser.parse_known_args()
+config = json.load(open(args_comp.config))
 
 MODELFILE = config['compressor_modelfile']
-N_COLOURS = int(args.n_colours)
+N_COLOURS = int(args_comp.n_colours)
+LIMIT = int(args_comp.limit) if args_comp.limit != "False" else False
 
 def get_model(modelfile=None) -> KMeans:
     """High-level function to load/fit model for KMeans colour compression."""
     # Try loading model from file...
-    if modelfile and os.path.isfile(modelfile) and args.train_new==False:
+    if modelfile and os.path.isfile(modelfile) and args_comp.train_new==False:
         # Load model for colour compression
         model = pickle.load(open(MODELFILE, "rb"))
     else:
@@ -62,7 +63,7 @@ def get_model(modelfile=None) -> KMeans:
         model = train_compressor(gold_rois, colours=N_COLOURS,
                                  modelfile=modelfile)
         # optional: get and save gold embeds created; needed for clustering.
-        if args.save or os.path.isfile(config['gold_embeds'])==False:
+        if args_comp.save or os.path.isfile(config['gold_embeds'])==False:
              # Get colour profiles & transform to colour embedding vectors
             _, gold_profiles = get_colour_profile(model, gold_rois)
             gold_c_embeds = vectorize_colours(gold_profiles)
@@ -115,7 +116,8 @@ def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
         return 0
 
     # Save model to file.
-    if (modelfile and os.path.isfile(modelfile)==False) or args.train_new:
+    if (modelfile and os.path.isfile(modelfile)==False) or args_comp.train_new:
+        raise ValueError('shoudl not save')
         save_kmeans_model(model, modelfile)
 
     return model
@@ -172,11 +174,13 @@ def get_colour_profile(model: KMeans, compressed_rois: list[np.ndarray]) \
             profile[tuple(np.uint8(col))] = profile.get(tuple(np.uint8(col)), 0)
         del profile[(0, 0, 0)]
 
-    # Normalise frequencies by roi size to get relative. Drop arrays where
-    # no non-transparent pixels remained (additional grabCut fail)
-    profiles_norm = [{col: count/sum(profile.values()) 
+    # Normalise frequencies by roi size to get relative. Preserve arrays where
+    # no non-transparent pixels remained (grabCut fail) to avoid issues with
+    # indexing items.
+    profiles_norm = [{col: count/sum(profile.values())
+                      if sum(profile.values()) > 0 else 0.0
                       for col, count in profile.items()}
-                     for profile in col_profiles if sum(profile.values()) > 0]
+                     for profile in col_profiles]
 
     # Sort profiles by colour centroids to have their order align across
     # dimensions.
@@ -193,7 +197,6 @@ def vectorize_colours(c_profiles: list[dict[tuple, float]]) -> list[np.ndarray]:
     return col_embeddings
 
 
-### move to example.py? ###
 def plot_example(model: KMeans, roi: np.ndarray):
     """Take a single array from a cropped image ROI; plot the input, its
     colour compressed version with the model's colour palette (1), plus its
@@ -248,17 +251,16 @@ def plot_example(model: KMeans, roi: np.ndarray):
     plt.show()
 
 
-def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
-                          limit: int|bool = False, save: bool = False) \
-                            -> list[np.ndarray]:
+def get_colour_embeddings(test_rois: np.ndarray, test_embeds_file: str = None,
+                        save: bool = False) -> list[np.ndarray]:
     """High level function, load/fit KMeans model for colour compression,
     load image ROIs from test data, transform and return their colour
     embeddings. Optionally save embeddings to file.
 
     Args:
-        test_roi_file (str): Filename for cropped test image ROI arrays.
+        test_roi_file (str): Cropped test image ROI arrays.
         test_embeds_file (str, optional): Filename to save colour embeddings
-            of test ROIs to to. Defaults to None.
+            of test ROIs to. Defaults to None.
         limit (int | bool, optional): Limit amounts of test image ROIs to
             apply script to. Defaults to False.
         save (bool, optional): Set whether to save colour embeddings to
@@ -274,19 +276,10 @@ def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
     # with gold_ROIs)
     kmeans_model = get_model(MODELFILE)
 
-    # Load pre-processed (cropped) test image rois.
-    if os.path.isfile(test_roi_file):
-        gen_rois = np.load(test_roi_file)
-        if limit: gen_rois = gen_rois[:limit]
-    else:
-        # try to create?
-        raise FileNotFoundError('No image ROIs found at', test_roi_file)
-        # ....
-
     # Perform KMeans colour compression on image ROIs.
     print('Compressing ROIs....')
     compressed_rois = [compress_colours(kmeans_model, img_arr)
-                       for img_arr in gen_rois]
+                       for img_arr in test_rois]
     # Get colour profiles
     colour_profiles = get_colour_profile(kmeans_model, compressed_rois)
 
@@ -302,7 +295,7 @@ def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
 
 
 if __name__=='__main__':
-    if args.example:
+    if args_comp.example:
         # run code on only one random image from test rois to plot: 
         # 1.1) test image ROI, 1.2) test image ROI post colour compression,
         # 1.3) colour palette of model, 2) test image colour profile graph.
@@ -313,10 +306,18 @@ if __name__=='__main__':
         plot_example(kmeans_model, test_roi)
 
     else:
+        if os.path.isfile(config['gen_ROIs']):
+            # Load pre-processed (cropped) test image rois.
+            test_rois = np.load(config['gen_ROIs'])
+        else:
+            # try to create?
+            raise FileNotFoundError('No image ROIs found at', config['gen_ROIs'])
+            # ....
         # Create colour embeddings from config npy file; if --save: save
         # to config embeds file.
-        col_embeds = get_colour_embeddings(config['gen_ROIs'],
-                                           config['gen_embeds'], int(args.limit),
-                                           args.save)
+        if LIMIT: test_rois = test_rois[:LIMIT]
+
+        col_embeds = get_colour_embeddings(test_rois, config['gen_embeds'],
+                                           args_comp.save)
     print('\n--- done ---')
 
