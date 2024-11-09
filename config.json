@@ -1,12 +1,13 @@
 {
     "data_dir": "./cats/",
-    "toy_dir": "./cats/CAT_06",
-    "gen_ROIs": "./cropped/genrois06.npy",
+    "toy_dir": "./cats/CAT_01",
+    "gen_ROIs": "./cropped/genrois01.npy",
     "gold_imgs_ref": "./cropped/gold_file_refs.txt",
 
     "devrois": "./cropped/devroisCAT00.npy",
     "gold_ROIs": "./cropped/goldroisCAT00.npy",
     "verbose": "True",
+
     "compressor_modelfile": "kmeans00.pickle",
 
     "gold_embeds":  "./cropped/gold_colour_embeds.npy",

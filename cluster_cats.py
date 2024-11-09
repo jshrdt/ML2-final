@@ -20,38 +20,19 @@ config = json.load(open(args.config))
 
 LIMIT = int(args.limit_to) if args.limit_to != "False" else False
 N_CLUSTERS = int(args.n_clusters)
-# def get_cluster(ROI_list, n=2):
-#     # oct 21, 16:32
-#     #https://github.com/beleidy/unsupervised-image-clustering/blob/master/capstone.ipynb
-#     ROI_matrix = np.array([np.uint8(img_arr*255).flatten() for img_arr in ROI_list],
-#                           dtype=np.float32)
-#     # normalise values
-#     ROI_matrix /= 255
-#     #flat_ROIs = KMeans.fit_transform(flat_ROIs) ??
-
-#     kmeans = KMeans(n_clusters=n, init='k-means++', random_state=0)
-#     Y = kmeans.fit_predict(ROI_matrix) #2mins for n=5, 50sec for n=2
-
-#     clusters_dict = {cluster_id : list() for cluster_id in set(Y)}
-#     for i, cluster_id in enumerate(Y):
-#         clusters_dict[cluster_id].append(ROI_list[i])
-
-#     return Y, clusters_dict
 
 
-
-# TBD train cluster KMEANS vs test ##
-def fit_clusters(embeddings, n=2):
+###  fit model ##
+def fit_clusters(embeddings, n=N_CLUSTERS):
     kmeans = KMeans(n_clusters=n, init='k-means++', random_state=0)
     kmeans.fit(embeddings) #2mins for n=5, 50sec for n=2
 
-    # save model
+    # save model?
 
     return kmeans
-    
 
 
-## TBD edit ####
+## apply ####
 
 def get_clusters(model, colour_embeddings):
     # oct 21, 16:32
@@ -106,16 +87,14 @@ if __name__=='__main__':
     # better plotting options
     # also means less files to chain and run
 
-    gold_rois = np.load(config["gold_img_ROIs_file"])
+    gold_rois = np.load(config["gold_ROIs"])
     gold_embeds = np.load(config['gold_embeds'])
-    model = fit_clusters(gold_embeds, n=N_CLUSTERS)
+    model = fit_clusters(gold_embeds)
 
     #gen_rois = np.load(config['devrois'])[:LIMIT]
     #gen_embeds =  np.load(config['dev_embeds'])[:LIMIT]
 
-
     Y = get_clusters(model, gold_embeds[:LIMIT])
-
 
     vis_clusters(Y, gold_rois)
 

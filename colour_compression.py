@@ -38,18 +38,40 @@ parser.add_argument('-col', '--n_colours', help='compress and plot random exampl
                     default=33)
 parser.add_argument('-ex', '--example', help='compress and plot random example',
                     action='store_true', default=False)
-parser.add_argument('-s', '--save', help='save created embeddings',
+parser.add_argument('-s', '--save', help='create & save colour embeddings',
                     action='store_true', default=False)
-parser.add_argument('-lim', '--limit_to', help='limit number of images used',
-                    default=False)
+parser.add_argument('-lim', '--limit', help='limit number of images used',
+                    default=0)
 
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
 MODELFILE = config['compressor_modelfile']
 N_COLOURS = int(args.n_colours)
-LIMIT = int(args.limit_to) if args.limit_to != False else -1
 
+def get_model() -> KMeans:
+    """High-level function to load/fit model for KMeans colour compression."""
+    # Try loading model from file...
+    if os.path.isfile(MODELFILE) and args.train_new==False:
+        # Load model for colour compression
+        model = pickle.load(open(MODELFILE, "rb"))
+    else:
+        # or fit a new model.
+        print('Training new model...')
+        # Load data for fitting & fit model; save model if modelfile passed.
+        gold_rois = np.load(config['gold_img_ROIs_file'])
+        model = train_compressor(gold_rois, colours=N_COLOURS,
+                                 modelfile=MODELFILE)
+        # optional: get and save gold embeds created; needed for clustering.
+        if args.save or os.path.isfile(config['gold_embeds'])==False:
+             # Get colour profiles & transform to colour embedding vectors
+            _, gold_profiles = get_colour_profile(model, gold_rois)
+            gold_c_embeds = vectorize_colours(gold_profiles)
+            # Save to file
+            np.save(config['gold_embeds'], gold_c_embeds)
+            print('Gold roi colour embeddings saved to', config['gold_embeds'])
+
+    return model
 
 def format_KMeans_input(array3d: np.ndarray) -> np.ndarray:
     """Reshape 3d of image to 2d array, preserve colour dimension."""
@@ -102,14 +124,15 @@ def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
 
     return model
 
+
 ### apply ###
 def compress_colours(model: KMeans, roi_array3d: np.ndarray) -> np.ndarray:
-    """Perform colour compression on an image array using KMeans model
-    previously fitted. Return image array of compressed colours.
+    """Perform colour compression on an image array using previously
+    fitted KMeans model. Return 2d image array of compressed colours.
 
     Args:
         model (KMeans): KMeans model for colour compression.
-        roi_array (np.ndarray): Array of input ROI
+        roi_array3d (np.ndarray): Array of input ROI.
 
     Returns:
         np.ndarray: Roi array with colours replaced by closest KMeans centroid.
@@ -121,42 +144,34 @@ def compress_colours(model: KMeans, roi_array3d: np.ndarray) -> np.ndarray:
     colour_labels = model.predict(roi_array)
 
     # Rebuild image array with compressed colours, normalise to int for plotting.
-    colours_compr = np.uint8(model.cluster_centers_[colour_labels])
+    compressed_roi_array = np.uint8(model.cluster_centers_[colour_labels])
 
-    return colours_compr
+    return compressed_roi_array
 
 
-def get_colour_profile(model: KMeans, img_arrays: np.ndarray) \
-        -> tuple[list[np.ndarray], list[dict[tuple, float]]]:
-    """Takes matrix of cropped image ROI arrays, performs KMeans colour
-    compression, and extracts colour profiles. Returns a list of colour
-    compressed image ROI arrays and a list of corresponding colour profile
-    dictionaries detailing the frequency of each colour centroid.
+def get_colour_profile(model: KMeans, compressed_rois: list[np.ndarray]) \
+        -> list[dict[tuple, float]]:
+    """Takes list of compressed image ROI arrays, extracts and returns
+    colour profiles: a list of dictionaries detailing the frequency of
+    each colour from the compression palette per image.
 
     Args:
         model (KMeans): Fitted KMeans model for colour compression.
-        img_arrays (np.ndarray): Matrix of image ROIs.
+        compressed_rois (list[np.ndarray]): List of colour compressed ROI 
+            arrays.
 
     Returns:
-        tuple[list[np.ndarray], list[dict[tuple, float]]]: List of colour
-            compressed image ROIs and list of colour profile dicts.
+        list[dict[tuple, float]]]: List of colour profile dicts for each
+            compressed roi from input.
     """
-    # If input is a single image, fake a batch dimension.
-    if len(img_arrays.shape) < 4: img_arrays = [img_arrays,]
-
-    # Perform KMeans colour compression on image ROIs.
-    print('Compressing ROIs....')
-    compressed_roi = [compress_colours(model, img_arr) for img_arr in img_arrays]
-
+    print('Creating colour profiles...')
     # Get corresponding colour profiles for each image:
     # dict of colour centroid: absolute frequency.
-    print('Creating colour profiles...')
-    col_profiles = [Counter(tuple(map(tuple, roi)))
-                    for roi in tqdm(compressed_roi)]
+    print(type(compressed_rois[0]), len(compressed_rois[0]))
+    col_profiles = [Counter(tuple(map(tuple, roi))) for roi in tqdm(compressed_rois)]
 
-    # Add in colours from centroid lists that were not found in image,
-    # to get vectors of same dimensionality later; throw out transparent
-    # background pixels (0,0,0).
+    # Add in colours from centroid lists that were not found in image and
+    # throw out background pixels marked by grabCut (0,0,0).
     for profile in col_profiles:
         for col in model.cluster_centers_:
             profile[tuple(np.uint8(col))] = profile.get(tuple(np.uint8(col)), 0)
@@ -165,129 +180,151 @@ def get_colour_profile(model: KMeans, img_arrays: np.ndarray) \
     # Normalise frequencies by roi size to get relative. Drop arrays where
     # no non-transparent pixels remained (additional grabCut fail)
     profiles_norm = [{col: count/sum(profile.values()) 
-                      for col, count in profile.items()
-
-                      }
-                     for profile in col_profiles
-                     if sum(profile.values())>0
-                     
-                     ]
-    
-    print([len(c) for c in profiles_norm])
+                      for col, count in profile.items()}
+                     for profile in col_profiles if sum(profile.values()) > 0]
 
     # Sort profiles by colour centroids to have their order align across
     # dimensions.
     profiles_sort = [dict(sorted(profile.items())) for profile in profiles_norm]
 
-    return compressed_roi, profiles_sort
+    return profiles_sort
 
 
 def vectorize_colours(c_profiles: list[dict[tuple, float]]) -> list[np.ndarray]:
     """Transform colour profiles to embeddings vectors  of N_COLOURS-1 dims."""
+    print('Vectorising profiles...')
     col_embeddings = [np.array(list(profile.values())) for profile in c_profiles]
 
     return col_embeddings
 
 
-def apply_colour_compression(model: KMeans, rois: np.ndarray) -> list[np.ndarray]:
-    """High level function, transform image ROI matrix to colour embeddings.
+### move to example.py? ###
+def plot_example(model: KMeans, roi: np.ndarray):
+    """Take a single array from a cropped image ROI; plot the input, its
+    colour compressed version with the model's colour palette (1), plus its
+    colour profile decompositon (2).
+    """
+    # 1: Create plot for: cropped ROI vs colour compressed ROI + colour palette...
+    compressed_roi = compress_colours(model, roi)
+    profile = get_colour_profile(model, [compressed_roi,]) # fake dimensiosn
+    compressed_img = np.uint8(compressed_roi.reshape(roi.shape[0], roi.shape[1],
+                                                     3))
+    # Extract full colour palette from model, reshape to horizontal bar/image.
+    colour_palette = np.uint8(sorted([tuple(col) for col in model.cluster_centers_
+                                      if sum(np.uint8(col)>0)], reverse=True))
+    colour_palette = (colour_palette / 255).reshape(1, len(colour_palette), 3)
+
+    # Create plots
+    fig = plt.figure()
+    gs = fig.add_gridspec(2,2, height_ratios=[5, 0.5])
+    ax1 = fig.add_subplot(gs[0,0])
+    ax2 = fig.add_subplot(gs[0,1])
+    ax3 = fig.add_subplot(gs[1,:])
+    # Plot
+    ax1.imshow(roi)
+    ax2.imshow(compressed_img)
+    ax3.imshow(colour_palette)
+    # Add info
+    ax1.set_title('Image post grabCut (input)')
+    ax2.set_title('Post KMeans colour compression')
+    ax3.set_title('Complete spectrum of colour centroids in compression model')
+
+    #2: ... and similarly for the colour profile.
+    profile = {col: freq*100 for col, freq in profile[0].items() if freq>0}
+    df = pd.DataFrame(profile.items(), columns=['colours', 'count'],
+                      index = [str(col) for col in profile.keys()])
+    # drop very rare colours (<0.01%) from the plot, sort colours by frequency.
+    df = df.drop(df[df['count']<0.01].index).sort_values(by='count',
+                                                         ascending=False)
+    # Set colours of bars to align with colour from image.
+    mycols = ['#%02x%02x%02x' % col for col in df['colours']]
+
+    # Create plots
+    fig2 = plt.figure(figsize=(9,6))
+    a0 = fig2.add_subplot(111)
+    # Plot
+    df.plot.barh(color={'count': mycols}, ax=a0)
+    # Add info
+    a0.set_title(f'Compressed colour profile (n={N_COLOURS-1}) of ROI (freq>0,01%)')
+    a0.set_xlabel('Prevalence of colours in compressed ROI (%)')
+    a0.set_ylabel('Colour as RGB code values')
+    a0.legend(labels=['Relative frequency of colour'], loc='upper right')
+
+    plt.show()
+
+    print('--- end ---')
+
+
+def get_colour_embeddings(test_roi_file: str , test_embeds_file: str = None,
+                          limit: int|bool = False, save: bool = False) \
+                            -> list[np.ndarray]:
+    """High level function, load/fit KMeans model for colour compression,
+    load image ROIs from test data, transform and return their colour
+    embeddings. Optionally save embeddings to file.
 
     Args:
-        model (KMeans): Fitted KMeans model for colour compression. 
-        rois (np.ndarray): Matrix of image ROI arrays.
+        test_roi_file (str): Filename for cropped test image ROI arrays.
+        test_embeds_file (str, optional): Filename to save colour embeddings
+            of test ROIs to to. Defaults to None.
+        limit (int | bool, optional): Limit amounts of test image ROIs to
+            apply script to. Defaults to False.
+        save (bool, optional): Set whether to save colour embeddings to
+            file. Defaults to False.
+
+    Raises:
+        FileNotFoundError: _description_
 
     Returns:
-        list[np.ndarray]: List of colour embeddings from image ROIs.
+        list[np.ndarray]: _description_
     """
+    # Get model (try to load from config file, else try to fit new model
+    # with gold_ROIs)
+    kmeans_model = get_model()
+
+    # Load pre-processed (cropped) test image rois.
+    if os.path.isfile(test_roi_file):
+        gen_rois = np.load(test_roi_file)
+        if limit: gen_rois = gen_rois[:limit]
+    else:
+        # try to create?
+        raise FileNotFoundError('No image ROIs found at', test_roi_file)
+        # ....
+
+    # Perform KMeans colour compression on image ROIs.
+    print('Compressing ROIs....')
+    compressed_rois = [compress_colours(kmeans_model, img_arr)
+                       for img_arr in gen_rois]
     # Get colour profiles
-    _, c_profiles = get_colour_profile(model, rois)
+    colour_profiles = get_colour_profile(kmeans_model, compressed_rois)
 
     # transform to colour embedding vectors
-    colour_embeddings = vectorize_colours(c_profiles)
+    colour_embeddings = vectorize_colours(colour_profiles)
+
+    # optional: save embeds to numpy file
+    if test_embeds_file and save:
+        np.save(test_embeds_file, colour_embeds)
+        print('Colour embeddings saved to', test_embeds_file)
 
     return colour_embeddings
 
-### move to example.py ###
-def plot_example(model, roi):
-    """Take a single array from a cropped image ROI, plot the input, and
-    its colour compressed version plus colour profile decompositon.
-    """
-
-    # create plot for: cropped ROI vs colour compressed ROI ...
-    compressed_roi, profile = get_colour_profile(model, roi)
-    compressed_img = np.uint8(compressed_roi[0].reshape(roi.shape[0],
-                                                        roi.shape[1],
-                                                        -1))
-
-    fig1, ax1 = plt.subplots(1,2)
-    ax1[0].imshow(roi)
-    ax1[1].imshow(compressed_img)
-    ax1[0].set_title('Image post grabCut')
-    ax1[1].set_title('Post KMeans colour compression')
-
-    #... and for colour profile
-    profile = {col: freq*100 for col, freq in profile[0].items()
-               if freq>0}
-    df = pd.DataFrame(profile.items(), columns=['colours', 'count'],
-                      index = [str(col) for col in profile.keys()]
-                      #'#%02x%02x%02x' % co
-                      )
-    # drop some colours with very low values from the plot, sort by frequency
-    df = df.drop(df[df['count'] < 0.01].index).sort_values(by='count', ascending=False)
-    mycols = ['#%02x%02x%02x' % col for col in df['colours']]
-
-    fig2 = plt.figure()
-    fig2.tight_layout
-    ax2 = fig2.add_subplot(111)
-
-    df.plot.barh(color={'count': mycols}, ax=ax2)
-    ax2.set_title(f'Compressed colour profile (n={N_COLOURS-1}) of ROI (freq>0,01%)')
-    ax2.legend(labels=['Relative frequency of colour in ROI in percent'],
-               loc='upper right')
-
-    plt.show()
-    print('--- end ---')
-
-### move to example.py ###
-def display_palette(model):
-    """Display colour palette used in KMeans model."""
-    gold_palette = np.array([np.uint8(col) for col in model.cluster_centers_
-                         if sum(np.uint8(col)>0)])
-    plt.imshow((gold_palette/255).reshape(1, len(gold_palette), 3))
-    plt.show()
-
 
 if __name__=='__main__':
-    if os.path.isfile(MODELFILE) and args.train_new==False:
-        # Load model for colour compression
-        kmeans_model = pickle.load(open(MODELFILE, "rb"))
-    else:
-        print('Training new model...')
-        # train new kmeans colour compression
-        gold_rois = np.load(config['gold_img_ROIs_file'])
-        kmeans_model = train_compressor(gold_rois, colours=N_COLOURS,
-                                        modelfile=MODELFILE)
-        if args.save or os.path.isfile(MODELFILE)==False:
-            gold_c_embeds = apply_colour_compression(kmeans_model, gold_rois)
-            np.save('./cropped/'+config['gold_embeds'], gold_c_embeds)
-            print('Gold roi colour embeddings saved to ./cropped/'+config['gold_embeds'])
-
-    # Load already croppped test image rois for compression
-    gen_rois = np.load(config['gen_ROIs'])[:LIMIT]
-    print(len(gen_rois))
-
     if args.example:
-        #display_palette(kmeans_model)
-        plot_example(kmeans_model, gen_rois[random.randint(0, len(gen_rois)-1)])
+        # run code on only one random image from test rois to plot: 
+        # 1.1) test image ROI, 1.2) test image ROI post colour compression,
+        # 1.3) colour palette of model, 2) test image colour profile graph.
+        kmeans_model = get_model()
+        if os.path.isfile(config['gen_ROIs']):
+            gen_rois = np.load(config['gen_ROIs'])
+            test_roi = gen_rois[random.randint(0, len(gen_rois)-1)]
+        plot_example(kmeans_model, test_roi)
 
     else:
-        print('\nApplying colour compression')
-        c_embeds = apply_colour_compression(kmeans_model, gen_rois)
-
-        # ? save to numpy
-        if config['gen_embeds'] and args.save:
-            np.save(config['gen_embeds'], c_embeds)
-            print('Colour embeddings saved to', config['gen_embeds'])
-
+        # Create colour embeddings from config npy file; if --save: save
+        # to config embeds file.
+        colour_embeds = get_colour_embeddings(config['gen_ROIs'],
+                                              config['gen_embeds'],
+                                              int(args.limit),
+                                              args.save)
     print('\n--- done ---')
 
