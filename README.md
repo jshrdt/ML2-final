@@ -4,15 +4,21 @@ Dataset: https://www.kaggle.com/datasets/crawford/cat-dataset/data, Oct 9 2024, 
 
 "super small projects"
 
+___
+
+Minimum file requirements: CAT00 folder, file refs
+
+Recommendation for testing:  
+
+The fastest way to run the files & view their main functionality; necessary files (ROI arrays/embeddings) will be created & saved on execution. As preprocessing of images to ROI arrays takes the longest, pass -lim (int) to limit the amount of test items to be processed (only relevant to reduce time if 'rois' file  does not already exists).
+
+(Optional but recommended: $ python3 preprocess_imgs.py & python3 preprocess_imgs.py -lim 100 -srcdir ./cats/CAT_01)
 
 
-Recommendation for testing:
-requirements: CAT00 folder, file refs
-
-$ python colour_compression.py -ex -lim 10, runtime ca 30secs from scratch
+$ python colour_compression.py -ex -lim 10, runtime ca 4secs from scratch ##8to create rows for gold embeddings
 -> plots random img's ROI, ROI post colour compression, its colour profile and the full compression palette
 
-$ python cluster_cats.py -vis -lim 80 -clst 4, runtime ca 1min from scratch
+$ python cluster_cats.py -vis -lim 80 -clst 4, runtime ca 8min from scratch, 4mins if colour_compression was run previously (gold embeds) saved
 -> plots clusters (4) for 80 imgs from test dir
 
 

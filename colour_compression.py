@@ -21,7 +21,6 @@ import pandas as pd
 import pickle
 
 from collections import Counter
-import random 
 from tqdm import tqdm
 import os
 from C4_helper import concat_imgs, save_kmeans_model, get_rois
@@ -61,7 +60,7 @@ def get_model(gold_dir=None, modelfile=None) -> KMeans:
         # or fit a new model.
         # Load data for fitting & fit model; save model if modelfile passed.
 ## TBD if no gold rois, create inplace
-        gold_rois =  get_rois(gold_dir, verbose=config['verbose'], save=args.save)
+        gold_rois =  get_rois(gold_dir, verbose=config['verbose'], save=True)
 
         model = train_compressor(gold_rois, colours=N_COLOURS,
                                  modelfile=modelfile)
@@ -270,12 +269,13 @@ def get_colour_embeddings(test_dir: np.ndarray, gold_dir=None, modelfile=None,
     Returns:
         list[np.ndarray]: _description_
     """
-    test_rois = get_rois(test_dir, limit=limit, verbose=config['verbose'], save=save)
     # Get model (try to load from config file, else try to fit new model
     # with gold_ROIs)
     kmeans_model = get_model(gold_dir, modelfile)
 
     # Perform KMeans colour compression on image ROIs.
+    test_rois = get_rois(test_dir, limit=limit, verbose=config['verbose'], save=save)
+
     print('Compressing ROIs from', test_dir['rois'])
     compressed_rois = [compress_colours(kmeans_model, img_arr)
                        for img_arr in test_rois]
@@ -286,8 +286,8 @@ def get_colour_embeddings(test_dir: np.ndarray, gold_dir=None, modelfile=None,
     colour_embeddings = vectorize_colours(colour_profiles)
 
     # optional: save test embeds to numpy file
-    if test_dir['embeds'] and args.save and gold_dir!=test_dir:
-        np.save(test_dir['embeds'], col_embeds)
+    if os.path.isfile(test_dir['embeds'])==False or save:
+        np.save(test_dir['embeds'], colour_embeddings)
         print('Colour embeddings saved to', test_dir['embeds'])
 
     return colour_embeddings
@@ -295,8 +295,8 @@ def get_colour_embeddings(test_dir: np.ndarray, gold_dir=None, modelfile=None,
 
 
 if __name__=='__main__':
-    gold_dir = config['CAT00_solid']
-    test_dir = config['CAT00_mixed']
+    gold_dir = config['CAT_00_solid']
+    test_dir = config['CAT_01']
     modelfile = gold_dir['compressor_modelfile']
     #modelfile = config['compressor_modelfile']
 
@@ -307,8 +307,7 @@ if __name__=='__main__':
         kmeans_model = get_model(gold_dir, modelfile)
         # ??limit shouldnt limit training of new model if non-existent
         # but stop from loading alllll thee rois here
-        rois = get_rois(test_dir, limit=LIMIT, is_ex=True)
-        test_roi = rois[random.randint(0, len(rois)-1)]
+        test_roi = get_rois(test_dir, limit=1, is_ex=True)[0]
         plot_example(kmeans_model, test_roi)
 
     else:

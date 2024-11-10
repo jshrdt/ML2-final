@@ -28,7 +28,6 @@ parser.add_argument('-col', '--n_colours', help='compress and plot random exampl
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
-MODELFILE = config['CAT00_solid']['cluster_modelfile']
 LIMIT = int(args.limit) if args.limit != "False" else False
 N_CLUSTERS = int(args.n_clusters)
 
@@ -147,12 +146,13 @@ def visualise_clusters(Y, imgs):
     plt.show()
 
 if __name__=='__main__':
-    gold_dir = config['CAT00_solid']
-    test_dir = config['CAT00_mixed']
+    gold_dir = config['CAT_00_solid']
+    test_dir = config['CAT_01']
+    modelfile = gold_dir['cluster_modelfile']
 
     # Cluster data
     Y = cluster_data(gold_dir, test_dir, limit=LIMIT, cluster_nr=N_CLUSTERS,
-                    modelfile=MODELFILE, visualise=args.visualise)
+                    modelfile=modelfile, visualise=args.visualise)
 
 
     # maybe create/drop npys here? want to plot og images for inspection, but info 

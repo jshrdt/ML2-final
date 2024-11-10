@@ -1,71 +1,13 @@
 # loader
 import os
-from PIL import Image
-from tqdm import tqdm
 import numpy as np
+import random
+
 import pickle
 
+from preprocess_imgs import get_cropped_ROIs
 
 
-class DataLoader:
-    def __init__(self, data_dir: str, split_data: bool = False):
-        self.data_dir = data_dir
-        self.imgfiles = self._fetch_files(data_dir)
-        #self.avg_size = (321, 275) #self._get_avg_size()
-
-        if split_data:
-            self.train, self.test = self._split()
-
-    def _fetch_files(self, data_dir):
-        print('Fetching files...')
-        catfiles = list()
-        for root, dirs, files in tqdm(os.walk(data_dir)):
-            for fname in sorted(files):
-                if fname.endswith('jpg'):
-                    catfiles.append(os.path.join(root, fname))
-                #elif fname.endswith('cat'):
-                 #   pointfiles.append(os.path.join(root, fname))
-
-        return catfiles
-
-    def _split(self):
-        #data_df = pd.DataFrame({'imgfiles': self.imgs, 'points': self.points})
-        
-        # for i, row in data_df.iterrows():
-        #     if row['imgfiles'].split('/') in self.gold_file_refs:
-        #         non_train_df
-        #     raise ValueError
-
-        #train_df = data_df.loc[data_df['imgfiles'] in self.gold_file_refs]
-
-        # Set cutoff points.
-        train_len = int(len(self.imgfiles)*0.8)
-        #test_len = int(train_len + len(self.gen_imgs)*0.2)
-
-        # Split data.
-        train_data = self.imgfiles[:train_len]
-        #dev_data = data_df[train_len:dev_len]
-        test_data = self.imgfiles[train_len:]
-
-        return train_data, test_data
-
-    def __len__(self):
-        return len(self.imgfiles)
-
-def get_avg_size(files) -> tuple[int, int]:
-    """Find average size of training files to resize input images to."""
-    # Collect file widths and heights.
-    sizes_w, sizes_h = list(), list()
-    for file in files:
-        with Image.open(file) as img:
-            size = img.size
-            sizes_w.append(size[0])
-            sizes_h.append(size[1])
-    # Get average file size in training dataset.
-    avg_size = (round(sum(sizes_w) / len(files)),
-                round(sum(sizes_h) / len(files)))
-
-    return avg_size
 
 def concat_imgs(img_arrays: list) -> np.ndarray:
     """Concat list of image arrays to matrix to facilitate fitting/plots."""
@@ -84,17 +26,23 @@ def save_kmeans_model(model, modelfile=None):
 
 
 ### write func to load gold rois only
-from preprocess_imgs import get_cropped_ROIs
 
 def get_rois(config_dir, limit=False, verbose=False, save=False, is_ex=False):
     if os.path.isfile(config_dir['rois']):
-        print('Loading ROI arrays from file...')
+        print('Loading ROI arrays from...', config_dir['rois'])
         rois = np.load(config_dir['rois'])
+        if is_ex:
+            np.random.default_rng().shuffle(rois)
+
         if limit: rois = rois[:limit]
     else:
         print('Creating ROI arrays using file refs from', config_dir['file_refs'])
         with open(config_dir['file_refs'], 'r') as f:
             files = f.read().split()
+
+        if is_ex:
+            random.shuffle(files)
+
 
         img_dict = get_cropped_ROIs(files, limit=limit, save=save,
                                     verbose=verbose)
@@ -107,8 +55,21 @@ def get_rois(config_dir, limit=False, verbose=False, save=False, is_ex=False):
 
     return rois
 
+def create_gold_refs(data_dir):
+    with open(data_dir['file_refs'], 'w') as f:
+        for root, dirs, files in os.walk(data_dir['imgs_dir']):
+            for fname in sorted(files):
+                if fname.endswith('.jpg'):
+                    f.write(f"{'./cats/CAT_00/'+fname}\n")
 
+# def gold_rois_from_imgs():
+#     gold_arrs = list()
+#     for root, dirs, files in os.walk('./cropped/imgs'):
+#         for fname in sorted(files):
+#             if fname.endswith('.jpg'):
+#                 with Image.open('./cropped/imgs/'+fname) as f:
+#                     gold_arrs.append(np.array(f))
+#     return gold_arrs
 
 if __name__=='__main__':
     pass
-    #data = DataLoader("./cats/", split_data=True)

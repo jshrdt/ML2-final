@@ -1,33 +1,27 @@
 {
-    "data_dir": "./cats/",
-    "toy_dir": "./cats/CAT_02",
-    "gen_ROIs": "./cropped/genrois02_sizeindivid.npy",
-
-    "devrois": "./cropped/devroisCAT00.npy",
-
-
-    "CAT00_mixed": {
-        "imgs": "./cropped/imgs/",
+    "CAT_00_mixed": {
+        "imgs_dir": "./cropped/imgs/",
         "file_refs": "./cropped/gold_mixed_file_refs.txt",
         "rois": "./cropped/gold_mixed_rois.npy",
         "embeds": "./cropped/gold_mixed_colour_embeds.npy",
-        "compressor_modelfile": "colour_kmeans00_mixed.pickle",
-        "cluster_modelfile": "cluster_kmeans01.pickle"
+        "compressor_modelfile": "kmeans_colour_mixed.pickle",
+        "cluster_modelfile": "kmeans_cluster_mixed.pickle"
 
     },
-
-    "CAT00_solid": {
-        "imgs": "./cropped/imgs_solids/",
+    "CAT_00_solid": {
+        "imgs_dir": "./cropped/imgs_solids/",
         "file_refs": "./cropped/gold_solid_file_refs.txt",
         "rois": "./cropped/gold_solid_rois.npy",
         "embeds": "./cropped/gold_solid_colour_embeds.npy",
-        "compressor_modelfile": "colour_kmeans10_solid.pickle",
-        "cluster_modelfile": "cluster_kmeans11_solid.pickle"
+        "compressor_modelfile": "kmeans_colour_solid.pickle",
+        "cluster_modelfile": "kmeans_cluster_solid.pickle"
     },
 
-    "verbose": "True",
+    "CAT_01": {
+        "imgs_dir": "./cats/CAT_01/",
+        "rois": "CAT_01_rois.npy",
+        "embeds": "CAT_01_embeds.npyy"
+    },
 
-    "dev_embeds": "./cropped/dev_colour_embeds.npy",
-    "gen_embeds": "./cropped/gen_embeds06.npy"
-
+    "verbose": "True"
 }

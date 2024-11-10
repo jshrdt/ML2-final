@@ -12,23 +12,21 @@ from cvlib.object_detection import draw_bbox
 from tqdm import tqdm
 import torch
 
-from C4_helper import DataLoader, get_avg_size
-
 parser = argparse.ArgumentParser()
 parser.add_argument('-conf', '--config', help='configuration file',
                     default='config.json')
-# parser.add_argument('-srcdir', '--source_directory',
-#                     help='directory to run preprocessing on',
-#                     default=False)
+parser.add_argument('-srcdir', '--source_directory',
+                    help='directory to run preprocessing on',
+                    default=False)
 parser.add_argument('-lim', '--limit',
-                    help='limit number of images used from dir for code testing',
+                    help='limit number of images processed from dir',
                     default=False)
 
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
-verbose = True if config['verbose'] == 'True' else False
 LIMIT = int(args.limit) if args.limit != "False" else False
+
 
 ## sources bbox/grabCut:
 # √ https://github.com/arunponnusamy/cvlib 
@@ -36,6 +34,22 @@ LIMIT = int(args.limit) if args.limit != "False" else False
 # √ https://www.analyticsvidhya.com/blog/2022/03/image-segmentation-using-opencv/, oct 19, 19:59
 
 # ? # faster r-cnn in pytorch: http://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html#torchvision.models.detection.fasterrcnn_resnet50_fpn
+
+def get_avg_size(files) -> tuple[int, int]:
+    """Find average size of training files to resize input images to."""
+    # Collect file widths and heights.
+    sizes_w, sizes_h = list(), list()
+    for file in files:
+        with Image.open(file) as img:
+            size = img.size
+            sizes_w.append(size[0])
+            sizes_h.append(size[1])
+    # Get average file size in training dataset.
+    avg_size = (round(sum(sizes_w) / len(files)),
+                round(sum(sizes_h) / len(files)))
+
+    return avg_size
+
 
 def get_bbox(imgfile: str|np.ndarray) -> tuple[bool, np.ndarray, list]:
     """Take an image (either as a filename or already as a numpy error)
@@ -155,7 +169,7 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
     algorithm and return dict of cropped image ROIs and excluded images
     sorted by error type (object detection failure, multiple objects found).
     """
-    print('Preprocessing images...')
+    print(f'Preprocessing images...')
     # Set desired size to resize images to: half of average size in dataset,
     # Improves runtime without hurting performance and assures uniform 
     # dimension to allow building of image array matrices.
@@ -163,19 +177,20 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
     # Slice input data, if limit was passed.
     data_imgs = files[:limit] if limit else files
 
-
     # Init container for cropped ROIs, and excluded images.
     img_dict = {'cropped_imgs': {}, 'detect_fail': list(), 'multi_obj': list()}
 
 # if save: need to get overall average size
     if save:
-        size_to = get_avg_size(files)
+        avg_size = get_avg_size(files)
     # Iterate over data and attempt to extract ROI.
     for imgfile in tqdm(data_imgs):
         # Read and resize image.
         with Image.open(imgfile) as f:
             if save==False:
                 size_to = (int(f.size[0]/2), int(f.size[1]/2))
+            else:
+                size_to = (int(avg_size[0]/2), int(avg_size[1]/2))
             img = np.array(f.resize(size_to))
 
         # Run object detection, evaluate output for further processing.
@@ -206,84 +221,36 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
     return img_dict
 
 
-
-### TBD, maybe move to helper?
-def create_gold_refs(data_dir):
-    with open(data_dir['file_refs'], 'w') as f:
-        for root, dirs, files in os.walk(data_dir['imgs']):
-            for fname in sorted(files):
-                if fname.endswith('.jpg'):
-                    f.write(f'{os.path.join(root, fname)}\n')
-
-# def gold_rois_from_imgs():
-#     gold_arrs = list()
-#     for root, dirs, files in os.walk('./cropped/imgs'):
-#         for fname in sorted(files):
-#             if fname.endswith('.jpg'):
-#                 with Image.open('./cropped/imgs/'+fname) as f:
-#                     gold_arrs.append(np.array(f))
-#     return gold_arrs
-
-#### save as img
-# from PIL import Image
-# if not os.path.isdir('./cropped/imgs'):
-#         os.makedirs('./cropped/imgs')
-
-# for i, img_arr in enumerate(img_dict['cropped_imgs']['img_arrs']):
-#     im = Image.fromarray(img_arr)
-#     fname = img_dict['cropped_imgs']['filenames'][i].split('/')[-1]
-#     im.save('./cropped/imgs/' + fname)
-
-###
-    # if not os.path.isdir('./cropped'):
-    #     os.makedirs('./cropped_dev')
-    # # save devs
-    # np.save('./cropped/' + img_ROIs_file, devs)
-    # np.save('./cropped/' + img_gold_ROIs_files, golds)
-    
-    ## visualise 
-#     import matplotlib.pyplot as plt
-# from PIL import Image
-# plt.imshow(Image.open('./cropped/imgs/'+data.gold_imgs[0].split('/')[-1]))
-
-###TBD  NEXT re-run with the solids and see if results change/r better??
-
 if __name__=='__main__':
-    # preprocess cat00, all imgs togehter
-    # then sort into gold/normal, and save as 2 numpy files
+    verbosity = True if config['verbose'] == 'True' else False
+
+    if args.source_directory:
+        source_dirs = [args.source_directory,] if type(args.source_directory)!= list else args.source_directory
+    else:
+        source_dirs = [config['CAT_00_solid'], config['CAT_00_mixed']]
+
     # fetch files
-    
-    create_gold_refs(config['CAT00_solid'])
-    
-    
-    
-#     source_dir = args.source_directory if args.source_directory else config['toy_dir']
+    print('Fetching files...')
+    for src_dir in source_dirs:
+        if type(src_dir)==dict: # one of the configured CAT00 subsets
+            with open(src_dir['file_refs'], 'r') as f:
+                filenames = f.read().split()
+            savefile = src_dir['rois']
+        else: # normal dir/ assume is not cat00
+            filenames = list()
+            for root, dirs, files in tqdm(os.walk(src_dir)):
+                for fname in sorted(files):
+                    if fname.endswith('.jpg'):
+                        filenames.append(os.path.join(root, fname))
 
-#     data = DataLoader(source_dir)
-#    # size_to = (int(data.avg_size[0]/2), int(data.avg_size[1]/2))
+            savefile = root.split('/')[-1] + '_rois.npy'
 
-#     # preprocess images
-#     img_dict = get_cropped_ROIs(data.imgfiles, verbose=config['verbose'],
-#                                 limit=LIMIT, save=True)
-#     # run this far to check processing speed/preprocessing success rate
+        img_dict = get_cropped_ROIs(filenames, limit=LIMIT, save=True,
+                                    verbose=verbosity)
 
-#     # filter out gold images
-#     if 'CAT_00' in source_dir:
-#         gold_arrs, gen_arrs = list(), list()
-#         with open(config['gold_imgs_ref'], 'r') as f:
-#             gold_file_refs = f.read().split()
-#         for fname, img_arr in img_dict['cropped_imgs'].items():
-#             if fname.split('/')[-1] in gold_file_refs:
-#                 gold_arrs.append(img_arr)
-#             else:
-#                 gen_arrs.append(img_arr)
-#         # if config['gold_img_ROIs_file'] and not os.path.isfile(config['gold_img_ROIs_file']):
-#         #     np.save(config['gold_img_ROIs_file'], gold_arrs)
-#     else:
-#         gen_arrs = list(img_dict['cropped_imgs'].values())
-#     # save (general) image rois as numpy matrix
-#     if config['gen_ROIs']:
-#         np.save(config['gen_ROIs'], gen_arrs)
-#         print('Rois from dir saved to', config['gen_ROIs'])
+        rois = list(img_dict['cropped_imgs'].values())
+
+        np.save(savefile, rois)
+        print('ROI arrays saved to', savefile, '\n')
 
     print('---end---')
