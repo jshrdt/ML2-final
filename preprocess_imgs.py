@@ -15,11 +15,11 @@ import torch
 from C4_helper import DataLoader, get_avg_size
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-c', '--config', help='configuration file',
+parser.add_argument('-conf', '--config', help='configuration file',
                     default='config.json')
-parser.add_argument('-srcdir', '--source_directory',
-                    help='directory to run preprocessing on',
-                    default=False)
+# parser.add_argument('-srcdir', '--source_directory',
+#                     help='directory to run preprocessing on',
+#                     default=False)
 parser.add_argument('-lim', '--limit',
                     help='limit number of images used from dir for code testing',
                     default=False)
@@ -162,12 +162,12 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
 
     # Slice input data, if limit was passed.
     data_imgs = files[:limit] if limit else files
-    
-# if save: need to get overall average size
+
 
     # Init container for cropped ROIs, and excluded images.
     img_dict = {'cropped_imgs': {}, 'detect_fail': list(), 'multi_obj': list()}
 
+# if save: need to get overall average size
     if save:
         size_to = get_avg_size(files)
     # Iterate over data and attempt to extract ROI.
@@ -202,16 +202,18 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
         print('Due to multiple objects found:', len(img_dict['multi_obj']))
         print('Cropped image-ROIs returned from {}:'.format(files[0].split('/')[-2]),
               len(img_dict['cropped_imgs']))
+
     return img_dict
 
+
+
 ### TBD, maybe move to helper?
-def create_gold_refs():
-    with open('./cropped/gold_solid_file_refs.txt', 'w') as f:
-        for root, dirs, files in os.walk('./cropped/imgs_solids/'):
+def create_gold_refs(data_dir):
+    with open(data_dir['file_refs'], 'w') as f:
+        for root, dirs, files in os.walk(data_dir['imgs']):
             for fname in sorted(files):
-                print(fname)
                 if fname.endswith('.jpg'):
-                    f.write(f'{fname}\n')
+                    f.write(f'{os.path.join(root, fname)}\n')
 
 # def gold_rois_from_imgs():
 #     gold_arrs = list()
@@ -233,7 +235,6 @@ def create_gold_refs():
 #     im.save('./cropped/imgs/' + fname)
 
 ###
-
     # if not os.path.isdir('./cropped'):
     #     os.makedirs('./cropped_dev')
     # # save devs
@@ -244,37 +245,15 @@ def create_gold_refs():
 #     import matplotlib.pyplot as plt
 # from PIL import Image
 # plt.imshow(Image.open('./cropped/imgs/'+data.gold_imgs[0].split('/')[-1]))
-import matplotlib.pyplot as plt
 
-### write func to load gold rois only
-def get_gold_rois():
-    if 0 and os.path.isfile(config['gold_ROIs']):
-        gold_rois = np.load(config['gold_ROIs'])
-    else:
-        with open(config['solid_refs'], 'r') as f:
-            gold_files = f.read().split()
-        gold_files = ['./cats/CAT_00/'+fname for fname in gold_files]
-
-    img_dict = get_cropped_ROIs(gold_files, limit=False,
-                                verbose=config['verbose'] ) 
-    gold_rois = list(img_dict['cropped_imgs'].values())
-    print(len(gold_rois))
-    plt.imshow(gold_rois[0])
-    plt.show()
-
-    return gold_rois
-
-
-# NEXT re-run with the solids and see if results change/r better??
-
+###TBD  NEXT re-run with the solids and see if results change/r better??
 
 if __name__=='__main__':
     # preprocess cat00, all imgs togehter
     # then sort into gold/normal, and save as 2 numpy files
     # fetch files
     
-    get_gold_rois()
-    #create_gold_refs()
+    create_gold_refs(config['CAT00_solid'])
     
     
     

@@ -5,6 +5,8 @@ from tqdm import tqdm
 import numpy as np
 import pickle
 
+
+
 class DataLoader:
     def __init__(self, data_dir: str, split_data: bool = False):
         self.data_dir = data_dir
@@ -76,9 +78,36 @@ def concat_imgs(img_arrays: list) -> np.ndarray:
 def save_kmeans_model(model, modelfile=None):
     if modelfile:
         pickle.dump(model, open(modelfile, "wb"))
-        print('Model saved to', modelfile)
+        print('Model saved to', modelfile, '\n')
     else:
         print('No modelfile to save to specified.')
+
+
+### write func to load gold rois only
+from preprocess_imgs import get_cropped_ROIs
+
+def get_rois(config_dir, limit=False, verbose=False, save=False, is_ex=False):
+    if os.path.isfile(config_dir['rois']):
+        print('Loading ROI arrays from file...')
+        rois = np.load(config_dir['rois'])
+        if limit: rois = rois[:limit]
+    else:
+        print('Creating ROI arrays using file refs from', config_dir['file_refs'])
+        with open(config_dir['file_refs'], 'r') as f:
+            files = f.read().split()
+
+        img_dict = get_cropped_ROIs(files, limit=limit, save=save,
+                                    verbose=verbose)
+
+        rois = list(img_dict['cropped_imgs'].values())
+
+        if is_ex==False and (save or os.path.isfile(config_dir['rois'])==False):
+            np.save(config_dir['rois'], rois)
+            print('ROI arrays saved to', config_dir['rois'], '\n')
+
+    return rois
+
+
 
 if __name__=='__main__':
     pass

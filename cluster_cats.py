@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
-from C4_helper import concat_imgs, save_kmeans_model
+from C4_helper import concat_imgs, save_kmeans_model, get_rois
 from colour_compression import get_colour_embeddings
 
 parser = argparse.ArgumentParser()
@@ -21,17 +21,19 @@ parser.add_argument('-refit', '--refit_model', help='force new training+saving o
                     action='store_true', default=False)
 parser.add_argument('-vis', '--visualise', help='plot emerging clusters',
                     action='store_true', default=False)
+parser.add_argument('-col', '--n_colours', help='compress and plot random example',
+                    default=33)
+
 
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
-MODELFILE =  config['cluster_modelfile']
+MODELFILE = config['CAT00_solid']['cluster_modelfile']
 LIMIT = int(args.limit) if args.limit != "False" else False
 N_CLUSTERS = int(args.n_clusters)
 
-
-def get_cluster_model(cluster_nr: int = 2, modelfile: str = None) -> KMeans:
-    """Return KMeans model for colour clustering, iether loaded from file
+def get_cluster_model(gold, cluster_nr: int = 2, modelfile: str = None) -> KMeans:
+    """Return KMeans model for colour clustering, either loaded from file
     or newly fit (optional: save to file).
 
     Args:
@@ -43,20 +45,16 @@ def get_cluster_model(cluster_nr: int = 2, modelfile: str = None) -> KMeans:
     Returns:
         KMeans: KMeans model for colour clustering.
     """
+    # Load model for colour clustering...
     if modelfile and os.path.isfile(modelfile) and args.refit_model==False:
-        # Load model for colour clustering...
         model = pickle.load(open(modelfile, "rb"))
+    # or fit a new one.
     else:
-        # or fit a new model.
-        print('Fitting new model...')
-    # create from scratch to avoid discrepancies
-    
-    # try to load gold imgs, and do preprocessing
-    
-    
-        gold_rois = np.load(config['gold_ROIs'])
-        gold_embeddings = get_colour_embeddings(gold_rois)
+        print('Preparing...')
+        # Get gold embeddings...
+        gold_embeddings = get_embeds(gold, gold, limit=False, save=True)
 
+        print('Fitting new clustering model...')
         model = KMeans(n_clusters=cluster_nr, init='k-means++', random_state=0)
         model.fit(gold_embeddings) #2mins for n=5, 50sec for n=2
 
@@ -67,27 +65,69 @@ def get_cluster_model(cluster_nr: int = 2, modelfile: str = None) -> KMeans:
 
 ## apply ####
 
-def cluster_data(test_rois, cluster_nr=2, modelfile=None):
+def get_embeds(test_dir, gold_dir=False, limit=False, save=False):
+    # Get embeddings...
+    if os.path.isfile(test_dir['embeds']):
+        # ...a) from file
+        print('Loading embeddings from file...', test_dir['embeds'])
+        embeddings = np.load(test_dir['embeds'])
+        if limit: embeddings = embeddings[:limit]
+
+    # Should always evaluate to True:
+    elif os.path.isfile(test_dir['rois']) or os.path.isfile(test_dir['file_refs']):
+        # ...b) from transforming gold rois (from file or run preprocessing
+        # on files as indiacated by file refs).
+        # Defaults to saving ROIs (longest processing time), & embeddings.
+        embeddings = get_colour_embeddings(test_dir, gold_dir,
+                                           modelfile=gold_dir['compressor_modelfile'],
+                                           limit=limit, save=save) #TBD
+    else:
+        raise FileNotFoundError(test_dir['rois'], test_dir['file_refs'],
+                                'Config error, neither ROI nor reference files found.')
+    return embeddings
+
+
+def dimensionality_mismatch(test_embeds, model):
+    print('-'*80,
+          f'Error: Test embeddings input has {len(test_embeds[0])} features,'
+          +f' but KMeans was fitted for {model.n_features_in_} features',
+          '-'*80,
+          'Solutions:',
+          f'(1) Create new test embeddings with n={model.n_features_in_} features ($ python colour_compression.py -new -s -col {model.n_features_in_})',
+          f'(2) Create new gold embeddings with n={len(test_embeds[0])} features & refit cluster model',
+          '-'*80,
+          sep='\n')
+    raise ValueError('Dimensionality mismatch')
+
+
+def cluster_data(gold_dir, test_dir, limit=False, cluster_nr=2, modelfile=None,
+                 visualise=False):
     # oct 21, 16:32
     #https://github.com/beleidy/unsupervised-image-clustering/blob/master/capstone.ipynb
 
     # Get model for colour-based clustering
-    model = get_cluster_model(cluster_nr, modelfile)
+    model = get_cluster_model(gold_dir, cluster_nr, modelfile)
+    # Get test embeddings
+    test_embeddings = get_embeds(test_dir, gold_dir, limit=limit, save=True)
 
-    # Transform image ROIs into colour embeddings
-    test_data_embeds = get_colour_embeddings(test_rois)
+    # check if dimensionalities align
+    if len(test_embeddings[0]) != model.n_features_in_:
+        dimensionality_mismatch(test_embeddings, model)
 
-    # # ??
-    # if type(test_arrays_file)==str:
-    #     test_arrays = np.load(test_arrays_file) # can also be created in-place
     # Cluster embeddings and get predicted cluster id per of embedding.
-    Y = model.predict(test_data_embeds)
+    Y = model.predict(test_embeddings)
+
+    if visualise:
+        rois = get_rois(test_dir, limit=limit)
+
+        visualise_clusters(Y, rois)
 
     return Y
 
 
 def visualise_clusters(Y, imgs):
     # Sort images by cluster
+    
     clustered_imgs =  {id: [] for id in set(Y)}
     for i, id in enumerate(Y):
         clustered_imgs[id].append(imgs[i])
@@ -106,31 +146,16 @@ def visualise_clusters(Y, imgs):
 
     plt.show()
 
-import random
 if __name__=='__main__':
-    ## RESTRUCTURE:
-   # Q? how to deal with grabcut fails -> col compression fails
-    test_dir = config['gen_ROIs']
+    gold_dir = config['CAT00_solid']
+    test_dir = config['CAT00_mixed']
 
-    if os.path.isfile(test_dir):
-        # Load pre-processed (cropped) test image rois.
-        test_rois = np.load(test_dir)
-        #random.shuffle(test_rois)
-        
-    else:
-        # try to create?; same as in col compression
-        raise FileNotFoundError('No image ROIs found at', test_dir)
+    # Cluster data
+    Y = cluster_data(gold_dir, test_dir, limit=LIMIT, cluster_nr=N_CLUSTERS,
+                    modelfile=MODELFILE, visualise=args.visualise)
 
-    ## tbd shuffle?
-    if LIMIT: test_rois = test_rois[:LIMIT]
-
-    # change on: load gen/gold_rois here, transform within function
-    Y = cluster_data(test_rois, cluster_nr=N_CLUSTERS,
-                    modelfile=MODELFILE)
-    if args.visualise:
-        visualise_clusters(Y, test_rois)
 
     # maybe create/drop npys here? want to plot og images for inspection, but info 
     # is lost by now; add some kind of id? use order preserved in files?
     # laod cropped rois again?
-    #print('\n--- done ---')
+    print('\n--- done ---')

@@ -5,6 +5,19 @@ Dataset: https://www.kaggle.com/datasets/crawford/cat-dataset/data, Oct 9 2024, 
 "super small projects"
 
 
+
+Recommendation for testing:
+requirements: CAT00 folder, file refs
+
+$ python colour_compression.py -ex -lim 10, runtime ca 30secs from scratch
+-> plots random img's ROI, ROI post colour compression, its colour profile and the full compression palette
+
+$ python cluster_cats.py -vis -lim 80 -clst 4, runtime ca 1min from scratch
+-> plots clusters (4) for 80 imgs from test dir
+
+
+
+
 ####
 Run preprocess: imgdir -> ROI nps
 
