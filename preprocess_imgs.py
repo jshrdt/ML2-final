@@ -35,7 +35,7 @@ LIMIT = int(args.limit) if args.limit != "False" else False
 
 # ? # faster r-cnn in pytorch: http://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html#torchvision.models.detection.fasterrcnn_resnet50_fpn
 
-def get_avg_size(files) -> tuple[int, int]:
+def get_avg_size(files: list) -> tuple[int, int]:
     """Find average size of training files to resize input images to."""
     # Collect file widths and heights.
     sizes_w, sizes_h = list(), list()
@@ -162,17 +162,27 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
     return cut_img
 
 
-def get_cropped_ROIs(files: list, verbose: bool = False,
-                     limit: bool = False, save = False) -> dict:
-    """Read and resize images, run object detection and judge suitablility
-    of image for further use. If suitable, use bounding box to run grabCut
-    algorithm and return dict of cropped image ROIs and excluded images
-    sorted by error type (object detection failure, multiple objects found).
+def get_cropped_ROIs(files: list[str], limit: bool = False, verbose: bool = False,
+                     save = False) -> dict[str, dict|list]:
+    """Take a list of image filenames, run object detection and judge
+    suitablility of image for further use. If suitable, use bounding box
+    to run grabCut algorithm and return dict of cropped image ROIs and
+    excluded images sorted by error type (object detection failure,
+    multiple objects found).
+
+    Args:
+        files (list[str]): List of iamge filenames.
+        limit (bool, optional): Restrict number of files to read.
+            Defaults to False.
+        verbose (bool, optional): Set amount of info to print. Defaults
+            to False.
+        save (bool, optional): Set whether to save extracted ROIs.
+            Defaults to False.
+
+    Returns:
+        dict: Contains image ROI arrary and items where code failed.
     """
     print(f'Preprocessing images...')
-    # Set desired size to resize images to: half of average size in dataset,
-    # Improves runtime without hurting performance and assures uniform 
-    # dimension to allow building of image array matrices.
 
     # Slice input data, if limit was passed.
     data_imgs = files[:limit] if limit else files
@@ -187,20 +197,20 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
     for imgfile in tqdm(data_imgs):
         # Read and resize image.
         with Image.open(imgfile) as f:
-            if save==False:
-                size_to = (int(f.size[0]/2), int(f.size[1]/2))
-            else:
-                size_to = (int(avg_size[0]/2), int(avg_size[1]/2))
+            # Reduce image size to improve runtime: half of own size, or half
+            # of average size of current files if ROIs are meant to be saved as
+            # matrix later.
+            size = f.size if save==False else avg_size
+            size_to = (int(size[0]/2), int(size[1]/2))
             img = np.array(f.resize(size_to))
 
         # Run object detection, evaluate output for further processing.
         use_img, _, bbox = get_bbox(img)
-        ## TBD work with labels and conf thresholds?
+
         if use_img:
             # Succesfull object detection, continue with grabCut
             cut_image = grabcut_algorithm(img, bbox[0])
             img_dict['cropped_imgs'][imgfile] = cut_image
-            #img_dict['cropped_imgs']['filenames'].append(imgfile)
 
         else:
             if len(bbox) > 1:
@@ -215,7 +225,7 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
                                    + len(img_dict['multi_obj'])))
         print('Due to object detection failure:', len(img_dict['detect_fail']))
         print('Due to multiple objects found:', len(img_dict['multi_obj']))
-        print('Cropped image-ROIs returned from {}:'.format(files[0].split('/')[-2]),
+        print(f'Cropped image-ROIs returned from {files[0].split("/")[-2]}:',
               len(img_dict['cropped_imgs']))
 
     return img_dict
@@ -223,34 +233,38 @@ def get_cropped_ROIs(files: list, verbose: bool = False,
 
 if __name__=='__main__':
     verbosity = True if config['verbose'] == 'True' else False
-
+    
+    # If no explicit directory is passed, default to running for CAT_00 subsets.
     if args.source_directory:
-        source_dirs = [args.source_directory,] if type(args.source_directory)!= list else args.source_directory
+        source_dirs = ([args.source_directory,] if type(args.source_directory)!=list
+                       else args.source_directory)
     else:
         source_dirs = [config['CAT_00_solid'], config['CAT_00_mixed']]
 
-    # fetch files
+    # Get files
     print('Fetching files...')
     for src_dir in source_dirs:
-        if type(src_dir)==dict: # one of the configured CAT00 subsets
+        # one of the configured CAT_00 subsets
+        if type(src_dir)==dict:
             with open(src_dir['file_refs'], 'r') as f:
                 filenames = f.read().split()
             savefile = src_dir['rois']
-        else: # normal dir/ assume is not cat00
+        # normal dir/ assume is not cat00
+        else:
             filenames = list()
             for root, dirs, files in tqdm(os.walk(src_dir)):
                 for fname in sorted(files):
                     if fname.endswith('.jpg'):
                         filenames.append(os.path.join(root, fname))
-
             savefile = root.split('/')[-1] + '_rois.npy'
 
+        # Get ROIs
         img_dict = get_cropped_ROIs(filenames, limit=LIMIT, save=True,
                                     verbose=verbosity)
-
         rois = list(img_dict['cropped_imgs'].values())
 
+        # Save ROIs to file
         np.save(savefile, rois)
         print('ROI arrays saved to', savefile, '\n')
 
-    print('---end---')
+    print('\n--- done ---')

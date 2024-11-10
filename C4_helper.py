@@ -8,7 +8,6 @@ import pickle
 from preprocess_imgs import get_cropped_ROIs
 
 
-
 def concat_imgs(img_arrays: list) -> np.ndarray:
     """Concat list of image arrays to matrix to facilitate fitting/plots."""
     step = int(len(img_arrays)**0.5+len(img_arrays)**0.2)
@@ -17,7 +16,9 @@ def concat_imgs(img_arrays: list) -> np.ndarray:
                                 axis=1)
     return img_matrix
 
-def save_kmeans_model(model, modelfile=None):
+
+def save_kmeans_model(model, modelfile: str = None):
+    """Save sklearn cluster KMeans model to file."""
     if modelfile:
         pickle.dump(model, open(modelfile, "wb"))
         print('Model saved to', modelfile, '\n')
@@ -25,43 +26,63 @@ def save_kmeans_model(model, modelfile=None):
         print('No modelfile to save to specified.')
 
 
-### write func to load gold rois only
+def get_rois(config_dir: dict, limit: bool = False, verbose: bool = False,
+             save: bool = False, is_ex: bool = False) -> list[np.ndarray]:
+    """Helper function to dynamically load/Create iamge ROIs across files.
 
-def get_rois(config_dir, limit=False, verbose=False, save=False, is_ex=False):
+    Args:
+        config_dir (dict): Config dict for data.
+        limit (bool, optional): Reduce number of items. Defaults to False.
+        verbose (bool, optional): Set side effect behaviour when creating
+            ROI arrays from scratch. Defaults to False.
+        save (bool, optional): Set whether to save ROI arrays to file,
+            affects resizing. Defaults to False.
+        is_ex (bool, optional): Configures code to return only a single
+            random ROI within range. Defaults to False.
+
+    Returns:
+        list[np.ndarray]: _description_
+    """
     if os.path.isfile(config_dir['rois']):
         print('Loading ROI arrays from...', config_dir['rois'])
         rois = np.load(config_dir['rois'])
+        # If example: get 1 random example in range
         if is_ex:
             np.random.default_rng().shuffle(rois)
-
         if limit: rois = rois[:limit]
-    else:
-        print('Creating ROI arrays using file refs from', config_dir['file_refs'])
-        with open(config_dir['file_refs'], 'r') as f:
-            files = f.read().split()
 
+    else:
+        if config_dir['file_refs']:
+            print('Creating ROI arrays using', config_dir['file_refs'])
+            # Get filenames
+            with open(config_dir['file_refs'], 'r') as f:
+                files = f.read().split()
+        else:
+            files = list()
+            for root, dirs, filenames in os.walk(config_dir['imgs_dir']):
+                for fname in sorted(filenames):
+                    if fname.endswith('.jpg'):
+                        files.append(os.path.join(root, fname))
         if is_ex:
             random.shuffle(files)
-
-
+        # Get image ROI arrays.
         img_dict = get_cropped_ROIs(files, limit=limit, save=save,
                                     verbose=verbose)
-
         rois = list(img_dict['cropped_imgs'].values())
 
+        # Save ROI arrays to file.
         if is_ex==False and (save or os.path.isfile(config_dir['rois'])==False):
             np.save(config_dir['rois'], rois)
             print('ROI arrays saved to', config_dir['rois'], '\n')
 
     return rois
 
-def create_gold_refs(data_dir):
-    with open(data_dir['file_refs'], 'w') as f:
-        for root, dirs, files in os.walk(data_dir['imgs_dir']):
-            for fname in sorted(files):
-                if fname.endswith('.jpg'):
-                    f.write(f"{'./cats/CAT_00/'+fname}\n")
-
+# def create_gold_refs(data_dir):
+#     with open(data_dir['file_refs'], 'w') as f:
+#         for root, dirs, files in os.walk(data_dir['imgs_dir']):
+#             for fname in sorted(files):
+#                 if fname.endswith('.jpg'):
+#                     f.write(f"{'./cats/CAT_00/'+fname}\n")
 # def gold_rois_from_imgs():
 #     gold_arrs = list()
 #     for root, dirs, files in os.walk('./cropped/imgs'):
