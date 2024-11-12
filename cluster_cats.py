@@ -6,9 +6,11 @@ import pickle
 import numpy as np
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from C4_helper import concat_imgs, save_kmeans_model, get_rois
-from colour_compression import get_colour_embeddings
+from feature_extraction import get_compress_model, compress_roi, get_colour_profile
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-conf', '--config', help='configuration file',
@@ -19,8 +21,6 @@ parser.add_argument('-clst', '--n_clusters', help='set number of clusters',
                     default=2)
 parser.add_argument('-refit', '--refit_model', help='force new training+saving of model',
                     action='store_true', default=False)
-parser.add_argument('-vis', '--visualise', help='plot emerging clusters',
-                    action='store_true', default=False)
 
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
@@ -29,8 +29,7 @@ LIMIT = int(args.limit) if args.limit != "False" else False
 N_CLUSTERS = int(args.n_clusters)
 
 
-def get_cluster_model(gold: dict, cluster_nr: int = 2, modelfile: str = None) \
-                    -> KMeans:
+def get_cluster_model(gold: dict, cluster_nr: int = 2)  -> KMeans:
     """Return KMeans model for colour clustering, either loaded from file
     or newly fit (optional: save to file).
 
@@ -38,33 +37,31 @@ def get_cluster_model(gold: dict, cluster_nr: int = 2, modelfile: str = None) \
         gold (dict): Config dir for gold data.
         cluster_nr (int, optional): Number of clusters to fit model to.
             Defaults to 2.
-        modelfile (str, optional): Filename to save model to. Defaults
-            to None.
 
     Returns:
         KMeans: KMeans model for colour clustering
     """
     # Load model for colour clustering...
-    if modelfile and os.path.isfile(modelfile) and args.refit_model==False:
-        model = pickle.load(open(modelfile, "rb"))
+    if os.path.isfile(gold_dir['cluster_modelfile']) and args.refit_model==False:
+        model = pickle.load(open(gold_dir['cluster_modelfile'], "rb"))
     # or fit a new one.
     else:
         # Get gold embeddings.
-        gold_embeddings = get_embeds(gold, gold, limit=False, save=True)
+        gold_embeddings_raw = get_embeds(gold, gold)['colour_embeddings']
+        gold_embeddings = [embed for embed in gold_embeddings_raw if sum(embed)>0]
         # Fit new model.
         print('Fitting new clustering model...')
         model = KMeans(n_clusters=cluster_nr, init='k-means++', random_state=0)
         model.fit(gold_embeddings)
 
         # Save model.
-        if (modelfile and os.path.isfile(modelfile)==False) or args.refit_model:
+        if os.path.isfile(gold_dir['cluster_modelfile'])==False or args.refit_model:
             save_kmeans_model(model, modelfile)
 
     return model
 
 
-def get_embeds(test_dir: dict, gold_dir: dict = False, limit: int = False,
-               save: bool = False) -> list[np.ndarray]:
+def get_embeds(test_dir: dict, gold_dir: dict = False, limit: int = False) -> list[np.ndarray]:
     """Create and return colour embeddings from test dir.
 
     Args:
@@ -73,8 +70,6 @@ def get_embeds(test_dir: dict, gold_dir: dict = False, limit: int = False,
             when model is loaded from file. Defaults to False.
         limit (int, optional): Limit number of test items. Defaults to 
             False.
-        save (bool, optional): Set whether to save embeddigns to file.
-            Defaults to False.
 
     Raises:
         FileNotFoundError: Worst case no reference file.
@@ -82,26 +77,33 @@ def get_embeds(test_dir: dict, gold_dir: dict = False, limit: int = False,
     Returns:
         list[np.ndarray]: Colour embedding for each input item.
     """
-    # Get embeddings...
-    if os.path.isfile(test_dir['embeds']):
-        # ...a) from file
-        print('Loading embeddings from file...', test_dir['embeds'])
-        embeddings = np.load(test_dir['embeds'])
-        if limit: embeddings = embeddings[:limit]
+    # Initialise container for organising data.
+    data = {'rois': list(), 'compressed_rois': list(), 'colour_profiles': list(),
+           'colour_embeddings': list()}
 
-    # Should always evaluate to True:
-    elif os.path.isfile(test_dir['rois']) or os.path.isfile(test_dir['file_refs']):
-        # ...b) from transforming gold rois (from file or run preprocessing
-        # on files as indiacated by file refs).
-        # Defaults to saving ROIs (longest processing time), & embeddings.
-        embeddings = get_colour_embeddings(test_dir, gold_dir,
-                                           modelfile=gold_dir['compressor_modelfile'],
-                                           limit=limit, save=save)
-    else:
-        raise FileNotFoundError(test_dir['rois'], test_dir['file_refs'],
-                                'Config error, neither ROI nor reference files found.')
+    # Get ROIs, get model for colour compression and extract colour palette.
+    test_rois = get_rois(test_dir, limit)
+    compression_model = get_compress_model(gold_dir)
+    palette = [tuple(np.uint8(col)) for col in compression_model.cluster_centers_] #format
 
-    return embeddings
+    print('Transforming data...')
+    # Iterative over ROI arrays, perform colour compression and vectorisation,
+    # store and initial, medial, and final representation in parallel dict.
+    for roi in tqdm(test_rois):
+        # Colour compression
+        compressed_roi = compress_roi(roi, compression_model)
+        # Colour profile creation
+        profile = get_colour_profile(compressed_roi, palette)
+        # Vectorisation
+        embedding = np.array(list(profile.values()))
+        # Store data
+        if sum(embedding)>0:
+            data['rois'].append(roi)
+            data['compressed_rois'].append(compressed_roi)
+            data['colour_profiles'].append(profile)
+            data['colour_embeddings'].append(embedding)
+
+    return data
 
 
 def dimensionality_mismatch(test_embeds, model):
@@ -140,45 +142,37 @@ def visualise_clusters(Y, imgs):
     plt.show()
 
 
-def cluster_data(gold_dir: dict, test_dir: dict, limit: bool = False,
-                 cluster_nr: int = 2, modelfile: str = None,
-                 visualise: bool = False):
+def cluster_data(test_dir: dict, gold_dir: dict, limit: bool = False,
+                 cluster_nr: int = 2) -> np.ndarray:
     """High-level function to cluster data in test dir according to gold dir.
 
     Args:
-        gold_dir (dict): Config dir for gold data.
         test_dir (dict): Config dir for test data.
+        gold_dir (dict): Config dir for gold data.
         limit (int, optional): Limit number of test items. Defaults to
             False.
         cluster_nr (int, optional): Number of clusters. Defaults to 2.
-        modelfile (str, optional): File for cluster model. Defaults to None.
-        visualise (bool, optional): Set whether to plot test data clusters.
-            Defaults to False.
 
     Returns:
-        _type_: _description_
+        np.ndarray: Array of cluster predictions for test data.
     """
     # oct 21, 16:32
     #https://github.com/beleidy/unsupervised-image-clustering/blob/master/capstone.ipynb
 
     # Get model for colour-based clustering
-    model = get_cluster_model(gold_dir, cluster_nr, modelfile)
-    # Get test embeddings
-    test_embeddings = get_embeds(test_dir, gold_dir, limit=limit, save=True)
+    model = get_cluster_model(gold_dir, cluster_nr)
 
-    # Check if dimensionalities of test embeds and model align
-    if len(test_embeddings[0]) != model.n_features_in_:
-        dimensionality_mismatch(test_embeddings, model)
+    # Get test embeddings
+    data_dict = get_embeds(test_dir, gold_dir, limit=limit)
+
+    # Check if dimensionalities of test embeds and model align, raise Error if not
+    if len(data_dict['colour_embeddings'][0]) != model.n_features_in_:
+        dimensionality_mismatch(data_dict['colour_embeddings'], model)
 
     # Cluster embeddings and get predicted cluster id per of embedding.
-    Y = model.predict(test_embeddings)
+    Y = model.predict(data_dict['colour_embeddings'])
 
-    if visualise:
-        # Plot test data
-        rois = get_rois(test_dir, limit=limit)
-        visualise_clusters(Y, rois)
-
-    return Y
+    return Y, data_dict['rois']
 
 
 if __name__=='__main__':
@@ -187,7 +181,9 @@ if __name__=='__main__':
     modelfile = gold_dir['cluster_modelfile']
 
     # Cluster data
-    Y = cluster_data(gold_dir, test_dir, limit=LIMIT, cluster_nr=N_CLUSTERS,
-                    modelfile=modelfile, visualise=args.visualise)
+    Y, rois = cluster_data(test_dir, gold_dir, limit=LIMIT, cluster_nr=N_CLUSTERS)
+
+    # Plot data
+    visualise_clusters(Y, rois)
 
     print('\n--- done ---')

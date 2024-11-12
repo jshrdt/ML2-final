@@ -150,8 +150,11 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
     foreground_mdl = np.zeros((1, 65), np.float64)
 
     # Run grabCut with bounding box info, prioritise low iter for speed
-    cv2.grabCut(img_arr, segment, bounding_box, background_mdl,
-                foreground_mdl, iterations, cv2.GC_INIT_WITH_RECT)
+    try:
+        cv2.grabCut(img_arr, segment, bounding_box, background_mdl,
+                    foreground_mdl, iterations, cv2.GC_INIT_WITH_RECT)
+    except cv2.error:  # unkown error started occuring at index 57 in CAT_00_mixed
+        pass
 
     # Update mask and remove background of image, by multiplying background
     # pixels with 0.
@@ -161,8 +164,8 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
     return cut_img
 
 
-def get_cropped_ROIs(files: list[str], limit: bool = False, verbose: bool = False,
-                     save = False) -> dict[str, dict|list]:
+def get_cropped_ROIs(files: list[str], limit: bool = False,
+                     verbose: bool = False) -> dict[str, dict[str, np.ndarray]|list[np.ndarray]]:
     """Take a list of image filenames, run object detection and judge
     suitablility of image for further use. If suitable, use bounding box
     to run grabCut algorithm and return dict of cropped image ROIs and
@@ -175,8 +178,6 @@ def get_cropped_ROIs(files: list[str], limit: bool = False, verbose: bool = Fals
             Defaults to False.
         verbose (bool, optional): Set amount of info to print. Defaults
             to False.
-        save (bool, optional): Set whether to save extracted ROIs.
-            Defaults to False.
 
     Returns:
         dict: Contains image ROI arrary and items where code failed.
