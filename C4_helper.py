@@ -52,7 +52,7 @@ def get_rois(config_dir: dict, limit: bool = False, verbose: bool = False,
         if limit: rois = rois[:limit]
 
     else:
-        if config_dir['file_refs']:
+        if config_dir.get('file_refs', 0):
             print('Creating ROI arrays using', config_dir['file_refs'])
             # Get filenames
             with open(config_dir['file_refs'], 'r') as f:

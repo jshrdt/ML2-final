@@ -37,7 +37,7 @@ parser.add_argument('-col', '--n_colours', help='compress and plot random exampl
                     default=32)
 parser.add_argument('-ex', '--example', help='compress and plot random example',
                     action='store_true', default=False)
-parser.add_argument('-s', '--save', help='save colour embeddings/model/roi',
+parser.add_argument('-save', '--save', help='save colour embeddings/model/roi',
                     action='store_true', default=False)
 parser.add_argument('-lim', '--limit', help='limit number of images used',
                     default=0)
@@ -47,6 +47,7 @@ config = json.load(open(args.config))
 
 N_COLOURS = int(args.n_colours) +1  # to account for (0,0,0) exclusion later
 LIMIT = int(args.limit) if args.limit != "False" else False
+
 
 def get_model(gold_dir: dict = None, modelfile: str = None) -> KMeans:
     """High-level function to load/fit model for KMeans colour compression."""
@@ -65,6 +66,7 @@ def get_model(gold_dir: dict = None, modelfile: str = None) -> KMeans:
                                  modelfile=modelfile)
 
     return model
+
 
 def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
                      samples: int = 10_000,  modelfile: str = None) -> KMeans:
@@ -103,6 +105,7 @@ def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
         save_kmeans_model(model, modelfile)
 
     return model
+
 
 def format_KMeans_input(array3d: np.ndarray) -> np.ndarray:
     """Reshape 3d of image to 2d array, preserve colour dimension."""
@@ -304,4 +307,3 @@ if __name__=='__main__':
                                            save=args.save)
 
     print('\n--- done ---')
-

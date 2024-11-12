@@ -21,14 +21,13 @@ parser.add_argument('-refit', '--refit_model', help='force new training+saving o
                     action='store_true', default=False)
 parser.add_argument('-vis', '--visualise', help='plot emerging clusters',
                     action='store_true', default=False)
-parser.add_argument('-col', '--n_colours', help='compress and plot random example',
-                    default=33)
 
 args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
 LIMIT = int(args.limit) if args.limit != "False" else False
 N_CLUSTERS = int(args.n_clusters)
+
 
 def get_cluster_model(gold: dict, cluster_nr: int = 2, modelfile: str = None) \
                     -> KMeans:
@@ -180,6 +179,7 @@ def cluster_data(gold_dir: dict, test_dir: dict, limit: bool = False,
         visualise_clusters(Y, rois)
 
     return Y
+
 
 if __name__=='__main__':
     gold_dir = config['CAT_00_solid']

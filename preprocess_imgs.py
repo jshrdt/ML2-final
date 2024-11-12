@@ -2,13 +2,12 @@ import argparse
 import json
 import os
 
-from PIL import Image
 import numpy as np
+from PIL import Image
 
 import cv2
 import cvlib as cv
 from cvlib.object_detection import draw_bbox
-
 from tqdm import tqdm
 import torch
 
@@ -26,7 +25,6 @@ args, unk = parser.parse_known_args()
 config = json.load(open(args.config))
 
 LIMIT = int(args.limit) if args.limit != "False" else False
-
 
 ## sources bbox/grabCut:
 # √ https://github.com/arunponnusamy/cvlib 
@@ -77,7 +75,7 @@ def get_bbox(imgfile: str|np.ndarray) -> tuple[bool, np.ndarray, list]:
 
     # confidence? nms tresh? ? gpu?
     # models:  yolov3, yolov3-tiny, yolov4, yolov4-tiny
-    bbox, label, conf = cv.detect_common_objects(img, model='yolov3',
+    bbox, label, conf = cv.detect_common_objects(img, model='yolov4',
                                                  enable_gpu=cuda_status)
 
     # Check/edit output: Checking if get_bbox was succesful occurs based on 
@@ -107,6 +105,7 @@ def get_bbox(imgfile: str|np.ndarray) -> tuple[bool, np.ndarray, list]:
 
     else:
         return use_img, None, bbox
+
 
 def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
                       iterations: int = 2) -> np.ndarray:
@@ -190,9 +189,8 @@ def get_cropped_ROIs(files: list[str], limit: bool = False, verbose: bool = Fals
     # Init container for cropped ROIs, and excluded images.
     img_dict = {'cropped_imgs': {}, 'detect_fail': list(), 'multi_obj': list()}
 
-# if save: need to get overall average size
-    if save:
-        avg_size = get_avg_size(files)
+    # Get overall average size for resizing.
+    size = get_avg_size(files)
     # Iterate over data and attempt to extract ROI.
     for imgfile in tqdm(data_imgs):
         # Read and resize image.
@@ -200,7 +198,6 @@ def get_cropped_ROIs(files: list[str], limit: bool = False, verbose: bool = Fals
             # Reduce image size to improve runtime: half of own size, or half
             # of average size of current files if ROIs are meant to be saved as
             # matrix later.
-            size = f.size if save==False else avg_size
             size_to = (int(size[0]/2), int(size[1]/2))
             img = np.array(f.resize(size_to))
 
@@ -233,7 +230,6 @@ def get_cropped_ROIs(files: list[str], limit: bool = False, verbose: bool = Fals
 
 if __name__=='__main__':
     verbosity = True if config['verbose'] == 'True' else False
-    
     # If no explicit directory is passed, default to running for CAT_00 subsets.
     if args.source_directory:
         source_dirs = ([args.source_directory,] if type(args.source_directory)!=list

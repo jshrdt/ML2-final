@@ -5,6 +5,9 @@ Dataset: https://www.kaggle.com/datasets/crawford/cat-dataset/data, Oct 9 2024, 
 "super small projects"
 
 ___
+Package requirements
+
+___
 
 Minimum file requirements: CAT00 folder, file refs
 
