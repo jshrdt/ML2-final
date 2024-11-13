@@ -5,8 +5,6 @@
 # License: BSD 3 clause
 ####################
 
-
-
 import argparse
 import json
 import os
@@ -48,7 +46,7 @@ def get_compress_model(gold_dir: dict = None) -> KMeans:
         print('Model for colour compression loaded from', gold_dir['compressor_modelfile'])
 
     elif gold_dir:
-        print('Fitting new model for colour compression...')
+        print('Fitting new model for colour compression on', gold_dir['rois'])
         # or fit a new model.
         # Load data for fitting & fit model; save model if modelfile passed.
         gold_rois = get_rois(gold_dir, verbose=config['verbose'], save=True)
@@ -85,7 +83,6 @@ def train_compressor(gold_img_arrays: np.ndarray, colours: int = N_COLOURS,
 
     try:
         # Fit model on subsample of matrix.
-        print('Fitting model...')
         matrix_sample = shuffle(gold_matrix_norm, random_state=0,
                                 n_samples=samples)
         model = KMeans(n_clusters=colours, random_state=0).fit(matrix_sample)
@@ -228,7 +225,7 @@ if __name__=='__main__':
     gold_dir = config['CAT_00_solid']
     test_dir = config['CAT_01']
 
-    # run code on only one random image from test rois to plot: 
+    # run code on only one random image from test rois to plot:
     # 1.1) test image ROI, 1.2) test image ROI post colour compression,
     # 1.3) colour palette of model, 2) test image colour profile graph.
     kmeans_model = get_compress_model(gold_dir)

@@ -42,26 +42,27 @@ def get_cluster_model(gold: dict, cluster_nr: int = 2)  -> KMeans:
         KMeans: KMeans model for colour clustering
     """
     # Load model for colour clustering...
-    if os.path.isfile(gold_dir['cluster_modelfile']) and args.refit_model==False:
-        model = pickle.load(open(gold_dir['cluster_modelfile'], "rb"))
+    if os.path.isfile(gold['cluster_modelfile']) and not args.refit_model:
+        model = pickle.load(open(gold['cluster_modelfile'], "rb"))
     # or fit a new one.
     else:
         # Get gold embeddings.
-        gold_embeddings_raw = get_embeds(gold, gold)['colour_embeddings']
-        gold_embeddings = [embed for embed in gold_embeddings_raw if sum(embed)>0]
+        gold_embeds_raw = get_embeds(gold, gold)['colour_embeddings']
+        gold_embeddings = [embed for embed in gold_embeds_raw if sum(embed)>0]
         # Fit new model.
-        print('Fitting new clustering model...')
+        print('Fitting new clustering model on embeds from', gold['rois'])
         model = KMeans(n_clusters=cluster_nr, init='k-means++', random_state=0)
         model.fit(gold_embeddings)
 
         # Save model.
-        if os.path.isfile(gold_dir['cluster_modelfile'])==False or args.refit_model:
+        if not os.path.isfile(gold['cluster_modelfile']) or args.refit_model:
             save_kmeans_model(model, modelfile)
 
     return model
 
 
-def get_embeds(test_dir: dict, gold_dir: dict = False, limit: int = False) -> list[np.ndarray]:
+def get_embeds(test_dir: dict, gold_dir: dict = False,
+               limit: int = False) -> list[np.ndarray]:
     """Create and return colour embeddings from test dir.
 
     Args:
@@ -176,8 +177,8 @@ def cluster_data(test_dir: dict, gold_dir: dict, limit: bool = False,
 
 
 if __name__=='__main__':
-    gold_dir = config['CAT_00_solid']
-    test_dir = config['CAT_01']
+    gold_dir = config['CAT_00_solid']#config['CAT_00_solid']
+    test_dir = gold_dir #config['CAT_01']
     modelfile = gold_dir['cluster_modelfile']
 
     # Cluster data

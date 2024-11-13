@@ -7,6 +7,7 @@ from PIL import Image
 
 import cv2
 import cvlib as cv
+from cvlib import detect_common_objects
 from cvlib.object_detection import draw_bbox
 from tqdm import tqdm
 import torch
@@ -75,7 +76,7 @@ def get_bbox(imgfile: str|np.ndarray) -> tuple[bool, np.ndarray, list]:
 
     # confidence? nms tresh? ? gpu?
     # models:  yolov3, yolov3-tiny, yolov4, yolov4-tiny
-    bbox, label, conf = cv.detect_common_objects(img, model='yolov4',
+    bbox, label, conf = detect_common_objects(img, model='yolov4',
                                                  enable_gpu=cuda_status)
 
     # Check/edit output: Checking if get_bbox was succesful occurs based on 
@@ -165,7 +166,7 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
 
 
 def get_cropped_ROIs(files: list[str], limit: bool = False,
-                     verbose: bool = False) -> dict[str, dict[str, np.ndarray]|list[np.ndarray]]:
+                     verbose: bool = False, save=False) -> dict[str, dict[str, np.ndarray]|list[np.ndarray]]:
     """Take a list of image filenames, run object detection and judge
     suitablility of image for further use. If suitable, use bounding box
     to run grabCut algorithm and return dict of cropped image ROIs and
@@ -256,8 +257,7 @@ if __name__=='__main__':
             savefile = root.split('/')[-1] + '_rois.npy'
 
         # Get ROIs
-        img_dict = get_cropped_ROIs(filenames, limit=LIMIT, save=True,
-                                    verbose=verbosity)
+        img_dict = get_cropped_ROIs(filenames, limit=LIMIT, verbose=verbosity)
         rois = list(img_dict['cropped_imgs'].values())
 
         # Save ROIs to file

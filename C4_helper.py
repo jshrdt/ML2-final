@@ -5,7 +5,7 @@ import random
 
 import pickle
 
-from preprocess_imgs import get_cropped_ROIs
+#from preprocess_imgs import get_cropped_ROIs
 
 
 def concat_imgs(img_arrays: list) -> np.ndarray:
@@ -52,28 +52,29 @@ def get_rois(config_dir: dict, limit: bool = False, verbose: bool = False,
         if limit: rois = rois[:limit]
 
     else:
-        if config_dir.get('file_refs', 0):
-            print('Creating ROI arrays using', config_dir['file_refs'])
-            # Get filenames
-            with open(config_dir['file_refs'], 'r') as f:
-                files = f.read().split()
-        else:
-            files = list()
-            for root, dirs, filenames in os.walk(config_dir['imgs_dir']):
-                for fname in sorted(filenames):
-                    if fname.endswith('.jpg'):
-                        files.append(os.path.join(root, fname))
-        if is_ex:
-            random.shuffle(files)
-        # Get image ROI arrays.
-        img_dict = get_cropped_ROIs(files, limit=limit, save=save,
-                                    verbose=verbose)
-        rois = list(img_dict['cropped_imgs'].values())
+        pass  # ROIs are supplied
+    # else:
+    #     if config_dir.get('file_refs', 0):
+    #         print('Creating ROI arrays using', config_dir['file_refs'])
+    #         # Get filenames
+    #         with open(config_dir['file_refs'], 'r') as f:
+    #             files = f.read().split()
+    #     else:
+    #         files = list()
+    #         for root, dirs, filenames in os.walk(config_dir['imgs_dir']):
+    #             for fname in sorted(filenames):
+    #                 if fname.endswith('.jpg'):
+    #                     files.append(os.path.join(root, fname))
+    #     if is_ex:
+    #         random.shuffle(files)
+    #     # Get image ROI arrays.
+    #     img_dict = get_cropped_ROIs(files, limit=limit, verbose=verbose)
+    #     rois = list(img_dict['cropped_imgs'].values())
 
-        # Save ROI arrays to file.
-        if is_ex==False and (save or os.path.isfile(config_dir['rois'])==False):
-            np.save(config_dir['rois'], rois)
-            print('ROI arrays saved to', config_dir['rois'], '\n')
+    #     # Save ROI arrays to file.
+    #     if is_ex==False and (save or os.path.isfile(config_dir['rois'])==False):
+    #         np.save(config_dir['rois'], rois)
+    #         print('ROI arrays saved to', config_dir['rois'], '\n')
 
     return rois
 

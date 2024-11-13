@@ -1,26 +1,23 @@
 {
     "CAT_00_mixed": {
-        "imgs_dir": "./cropped/imgs/",
-        "file_refs": "./cropped/gold_mixed_file_refs.txt",
-        "rois": "./cropped/gold_mixed_rois.npy",
-        "embeds": "./cropped/gold_mixed_colour_embeds.npy",
+        "file_refs": "./gold_mixed_file_refs.txt",
+        "rois": "./gold_mixed_rois.npy",
         "compressor_modelfile": "kmeans_colour_mixed.pickle",
         "cluster_modelfile": "kmeans_cluster_mixed.pickle"
-
     },
     "CAT_00_solid": {
-        "imgs_dir": "./cropped/imgs_solids/",
-        "file_refs": "./cropped/gold_solid_file_refs.txt",
-        "rois": "./cropped/gold_solid_rois.npy",
-        "embeds": "./cropped/gold_solid_colour_embeds.npy",
+        "imgs_dir": "./imgs_solids/",
+        "file_refs": "./gold_solid_file_refs.txt",
+        "rois": "./gold_solid_rois.npy",
         "compressor_modelfile": "kmeans_colour_solid.pickle",
         "cluster_modelfile": "kmeans_cluster_solid.pickle"
     },
-
     "CAT_01": {
         "imgs_dir": "./cats/CAT_01/",
         "rois": "CAT_01_rois.npy",
-        "embeds": "CAT_01_embeds.npyy"
+        "compressor_modelfile": "kmeans_colour_01.pickle",
+        "cluster_modelfile": "kmeans_cluster_01.pickle"
+
     },
 
     "verbose": "True"
