@@ -39,7 +39,9 @@ cluster_cats.py
 
 ____
 
-### Recommendation for testing, in no particular order:  
+### Recommendation for testing, files no particular order:  
+
+First: Unzip .npy files
 
 > $ python feature_extraction.py
 * Fits and saves a KMeans (k=32) colour compression model on compressed ROIs from CAT_00_solid
@@ -55,21 +57,21 @@ To change which data is used for model fitting and which are used as test data i
 
 Command line arguments are as follows; any arguments specified for the feature extraction script can be internally passed along when executing the cluster_cats script
 
-* feature_extraction.py
---train_new (-new): Fit+save a new colour compression model (default=False)
---n_colours (-col): Set max number of colours across dataset to compress images to (default=32)
+* feature_extraction.py  
+--train_new (-new): Fit+save a new colour compression model (default=False)  
+--n_colours (-col): Set max number of colours across dataset to compress images to (default=32)  
 
-* cluster_cats.py
---refit_model (-refit): Fit+save a new clustering model (default=False)
---n_clusters (-clst): Set number of clusters (default=2)
---limit (lim): Set max number of ROI arrays from test data to predict/plot (default=False)
+* cluster_cats.py  
+--refit_model (-refit): Fit+save a new clustering model (default=False)  
+--n_clusters (-clst): Set number of clusters (default=2)  
+--limit (lim): Set max number of ROI arrays from test data to predict/plot (default=False)  
 
 ___
 
-Since preprocessing takes some time & relies on cv/cvlib which uses tensor flow, I have decided to supply toy samples of the ROI files for easy testing of code. Preprocessing was done using these commands and requires some more modules/files as detailed above. To run the code yourself, uncomment the 'from ...import...' statement and second half of the get_rois() function in helper.py.
+Since preprocessing takes some time & relies on cv/cvlib which uses tensor flow, I have decided to supply toy samples of the ROI files for easy testing of the code. Preprocessing was done using these commands and requires some more modules/files as detailed above. To run the code yourself, uncomment the 'from ...import...' statement and second half of the get_rois() function in helper.py. I recommend passing -lim X to reduce the nr of items processed from CAT_01 in particular.
 
-1) > $ python process_imgs.py  
-* handles extraction of ROI arrays for gold sets CAT_00_solid and CAT_00_mixed, saves these as .npy files 
+> $ python process_imgs.py  
+* handles extraction of ROI arrays for gold sets CAT_00_solid and CAT_00_mixed, saves these as .npy files to roi path in config
 
-2) > $ python process_imgs.py -srcdir ./cats/CAT_01 -lim 200
-* handles extraction of ROI arrays for the first 200 images in blind test set CAT_01, saves these as .npy files 
+> $ python process_imgs.py -srcdir ./cats/CAT_01
+* handles extraction of ROI arrays for the first 200 images in blind test set CAT_01, saves these as .npy files to roi path in config

@@ -234,8 +234,7 @@ if __name__=='__main__':
         source_dirs = ([args.source_directory,] if type(args.source_directory)!=list
                        else args.source_directory)
     else:
-        source_dirs = [config['CAT_00_solid'], config['CAT_00_mixed']]
-
+        source_dirs = [config['CAT_00_mixed'],]#[config['CAT_00_solid'], config['CAT_00_mixed']]
     # Get files
     print('Fetching files...')
     for src_dir in source_dirs:
