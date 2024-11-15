@@ -5,9 +5,9 @@ import os
 import numpy as np
 from PIL import Image
 
-import cv2
-from cvlib import detect_common_objects
-from cvlib.object_detection import draw_bbox
+# import cv2
+# from cvlib import detect_common_objects
+# from cvlib.object_detection import draw_bbox
 from tqdm import tqdm
 import torch
 
@@ -165,7 +165,8 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
 
 
 def get_cropped_ROIs(files: list[str], limit: bool = False,
-                     verbose: bool = False) -> dict[str, dict[str, np.ndarray]|list[np.ndarray]]:
+                     verbose: bool = False) -> \
+                        dict[str, dict[str, np.ndarray]|list[np.ndarray]]:
     """Take a list of image filenames, run object detection and judge
     suitablility of image for further use. If suitable, use bounding box
     to run grabCut algorithm and return dict of cropped image ROIs and
@@ -231,7 +232,8 @@ if __name__=='__main__':
     verbosity = True if config['verbose'] == 'True' else False
     # If no explicit directory is passed, default to running for CAT_00 subsets.
     if args.source_directory:
-        source_dirs = ([args.source_directory,] if type(args.source_directory)!=list
+        source_dirs = ([args.source_directory,]
+                       if type(args.source_directory)!=list
                        else args.source_directory)
     else:
         source_dirs = [config['CAT_00_mixed'],]#[config['CAT_00_solid'], config['CAT_00_mixed']]

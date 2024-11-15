@@ -85,7 +85,8 @@ def get_embeds(test_dir: dict, gold_dir: dict = False,
     # Get ROIs, get model for colour compression and extract colour palette.
     test_rois = get_rois(test_dir, limit)
     compression_model = get_compress_model(gold_dir)
-    palette = [tuple(np.uint8(col)) for col in compression_model.cluster_centers_] #format
+    palette = [tuple(np.uint8(col))
+               for col in compression_model.cluster_centers_]
 
     print('Transforming data...')
     # Iterative over ROI arrays, perform colour compression and vectorisation,
@@ -177,12 +178,13 @@ def cluster_data(test_dir: dict, gold_dir: dict, limit: bool = False,
 
 
 if __name__=='__main__':
-    gold_dir = config['CAT_01']#config['CAT_00_solid']
-    test_dir = config['CAT_01']#gold_dir#config['CAT_01']
+    gold_dir = config['CAT_00_solid']
+    test_dir = config['CAT_00_solid']#config['CAT_01']
     modelfile = gold_dir['cluster_modelfile']
 
     # Cluster data
-    Y, rois = cluster_data(test_dir, gold_dir, limit=LIMIT, cluster_nr=N_CLUSTERS)
+    Y, rois = cluster_data(test_dir, gold_dir, limit=LIMIT,
+                           cluster_nr=N_CLUSTERS)
 
     # Plot data
     visualise_clusters(Y, rois)

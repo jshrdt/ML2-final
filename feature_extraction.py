@@ -1,10 +1,9 @@
 
-### adapted from ###
+### colour compression adapted from ###
 # https://scikit-learn.org/1.5/auto_examples/cluster/plot_color_quantization.html
 # Authors: Robert Layton, Olivier Grisel, Mathieu Blondel
 # License: BSD 3 clause
 ####################
-
 import argparse
 import json
 import os

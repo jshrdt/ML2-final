@@ -68,7 +68,7 @@ Command line arguments are as follows; any arguments specified for the feature e
 
 ___
 
-Since preprocessing takes some time & relies on cv/cvlib which uses tensor flow, I have decided to supply toy samples of the ROI files for easy testing of the code. Preprocessing was done using these commands and requires some more modules/files as detailed above. To run the code yourself, uncomment the 'from ...import...' statement and second half of the get_rois() function in helper.py. I recommend passing -lim X to reduce the nr of items processed from CAT_01 in particular.
+Since preprocessing takes some time & relies on cv/cvlib which uses tensor flow, I have decided to supply toy samples of the ROI files for easy testing of the code. Preprocessing was done using these commands and requires some more modules/files as detailed above. To run the code yourself, uncomment the 'from ...import...' statement and second half of the get_rois() function in helper.py, as well as the import statements in process_imgs.py. I recommend passing -lim X to process_imgs.py to reduce the nr of items processed from CAT_01 in particular.
 
 > $ python process_imgs.py  
 * handles extraction of ROI arrays for gold sets CAT_00_solid and CAT_00_mixed, saves these as .npy files to roi path in config
