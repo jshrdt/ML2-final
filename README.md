@@ -39,7 +39,7 @@ cluster_cats.py
 
 ____
 
-### Recommendation for testing, files no particular order:  
+### Recommendation for testing, files in no particular order:  
 
 First: Unzip .npy files
 
@@ -48,7 +48,7 @@ First: Unzip .npy files
 * picks one random ROI array from the CAT_01_rois.npy file created in (2) and runs the feature extraction steps; plots (1.1) the original ROI array, (1.2) the colour compressed ROI array, (1.3) the associated full colour palette the colour compression model extracted from the gold set CAT_00_solid and used in compression, and (2) the colour profile of the exemplary compressed ROI array (a relative frequency distribution of colour centroids, min freq > 0.01%).
 
 
-> § python cluster_cats.py -lim 100 -clst 4
+> $ python cluster_cats.py -lim 100 -clst 4
 * Fits and saves a KMeans (k=4) clustering model on colour embeddings from CAT_00_solid
 * Clusters and plots the first 100 image ROIs from CAT_01
 
@@ -64,7 +64,7 @@ Command line arguments are as follows; any arguments specified for the feature e
 * cluster_cats.py  
 --refit_model (-refit): Fit+save a new clustering model (default=False)  
 --n_clusters (-clst): Set number of clusters (default=2)  
---limit (lim): Set max number of ROI arrays from test data to predict/plot (default=False)  
+--limit (-lim): Set max number of ROI arrays from test data to predict/plot (default=False)  
 
 ___
 
