@@ -26,13 +26,6 @@ config = json.load(open(args.config))
 
 LIMIT = int(args.limit) if args.limit != "False" else False
 
-## sources bbox/grabCut:
-# √ https://github.com/arunponnusamy/cvlib 
-# √ https://github.com/lihini223/Object-Detection-model/blob/main/objectdetection.ipynb
-# √ https://www.analyticsvidhya.com/blog/2022/03/image-segmentation-using-opencv/, oct 19, 19:59
-
-# ? # faster r-cnn in pytorch: http://pytorch.org/vision/main/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html#torchvision.models.detection.fasterrcnn_resnet50_fpn
-
 def get_avg_size(files: list) -> tuple[int, int]:
     """Find average size of training files to resize input images to."""
     # Collect file widths and heights.
@@ -64,7 +57,6 @@ def get_bbox(imgfile: str|np.ndarray) -> tuple[bool, np.ndarray, list]:
             image for further code, array of image with bounding box,
             bounding box coordinates.
     """
-
     if type(imgfile)==str:
         with Image.open(imgfile) as f:
             img = np.array(f)
@@ -124,10 +116,6 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
         np.ndarray: Image ROI array with background of transparent
             (0,0,0) pixels.
     """
-
-    # more advanced segmentation based on colour in cv2?
-    #https://www.kaggle.com/code/amulyamanne/image-segmentation-color-clustering/notebook
-
     # Read/convert image input to np.uint8 np.ndarray (range 0,255).
     if type(img)==str:
         with Image.open(img) as f:
@@ -136,7 +124,8 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
         img_arr = np.array(img*255, dtype=np.uint8)
     else:
         img_arr = img
-
+      
+    # https://www.analyticsvidhya.com/blog/2022/03/image-segmentation-using-opencv/, oct 19
     # Create segment template of (width, height) size of input image.
     segment = np.zeros(img_arr.shape[:2], np.uint8)
 
@@ -145,7 +134,7 @@ def grabcut_algorithm(img: str|np.ndarray, bounding_box: list,
     x, y, width, height = bounding_box
     segment[y:(y+height), x:(x+width)] = 1
 
-    # Create templates for bacground and foreground
+    # Create internal layers
     background_mdl = np.zeros((1, 65), np.float64)
     foreground_mdl = np.zeros((1, 65), np.float64)
 
@@ -255,7 +244,6 @@ if __name__=='__main__':
             savefile = root.split('/')[-1] + '_rois.npy'
 
         # Get ROIs
-
         img_dict = get_cropped_ROIs(filenames, limit=LIMIT, verbose=verbosity)
         rois = list(img_dict['cropped_imgs'].values())
 
