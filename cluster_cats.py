@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from C4_helper import concat_imgs, save_kmeans_model, get_rois
+from helper import concat_imgs, save_kmeans_model, get_rois
 from feature_extraction import get_compress_model, compress_roi, get_colour_profile
 
 
@@ -171,14 +171,14 @@ def cluster_data(test_dir: dict, gold_dir: dict, limit: bool = False,
         dimensionality_mismatch(data_dict['colour_embeddings'], model)
 
     # Cluster embeddings and get predicted cluster id per of embedding.
-    Y = model.predict(data_dict['colour_embeddings'])
+    Y = model.fit_predict(data_dict['colour_embeddings'])
 
     return Y, data_dict['rois']
 
 
 if __name__=='__main__':
-    gold_dir = config['CAT_00_solid']#config['CAT_00_solid']
-    test_dir = gold_dir #config['CAT_01']
+    gold_dir = config['CAT_01']#config['CAT_00_solid']
+    test_dir = config['CAT_01']#gold_dir#config['CAT_01']
     modelfile = gold_dir['cluster_modelfile']
 
     # Cluster data

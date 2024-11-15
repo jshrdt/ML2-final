@@ -19,7 +19,7 @@ from sklearn.exceptions import ConvergenceWarning
 import pandas as pd
 import pickle
 
-from C4_helper import concat_imgs, save_kmeans_model, get_rois
+from helper import concat_imgs, save_kmeans_model, get_rois
 
 warnings.filterwarnings('error', category=ConvergenceWarning)
 
@@ -43,7 +43,8 @@ def get_compress_model(gold_dir: dict = None) -> KMeans:
     if os.path.isfile(gold_dir['compressor_modelfile']) and args.train_new==False:
         # Load model for colour compression
         model = pickle.load(open(gold_dir['compressor_modelfile'], "rb"))
-        print('Model for colour compression loaded from', gold_dir['compressor_modelfile'])
+        print('Model for colour compression loaded from',
+              gold_dir['compressor_modelfile'])
 
     elif gold_dir:
         print('Fitting new model for colour compression on', gold_dir['rois'])
@@ -146,11 +147,14 @@ def get_colour_profile(compressed_roi: np.ndarray, palette: list[tuple]) \
     """
     # Get raw colour profile from input array as a dict mapping each unique
     # colour centroid int the image to its absolute frequency therein.
+    # Efficiency: counter needs about  0,076s per ROI, significantly faster
+    # than a python dict with the dict.get() method (0,353s per ROI).
     colour_profile = Counter(tuple(map(tuple, compressed_roi)))
 
     # Add in colours from centroid list that did not occur in image array
     # to even out dimensions.
     for col in palette:
+        #colour_profile[col] = 1 if col in colour_profile else 0
         colour_profile[col] = colour_profile.get(col, 0)
     del colour_profile[(0, 0, 0)]
 

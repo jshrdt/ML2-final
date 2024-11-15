@@ -1,9 +1,5 @@
 # ML2-final
 
-Dataset: https://www.kaggle.com/datasets/crawford/cat-dataset/data, Oct 9 2024, 11:05am
-
-"super small projects"
-
 ___
 ### Package requirements:  
 argparse, json, os, random, warnings, collections, matplotlib.pyplot, numpy, pandas, pickle, sklearn, tqdm
@@ -19,11 +15,11 @@ ___
 config.json
 * Specifies paths for loading/saving
 
-C4_helper.py  
+helper.py  
 * some loading/processing functions shared across files
 * no main function
 
-preprocess_imgs.py  
+process_imgs.py  
 * Loading images from files
 * Object detection
 * GrabCut image segmentation
@@ -47,7 +43,7 @@ ____
 
 > $ python feature_extraction.py
 * Fits and saves a KMeans (k=32) colour compression model on compressed ROIs from CAT_00_solid
-* picks one random ROI array from the CAT_01_rois.npy file created in (2) and runs the feature extraction steps; plots (1.1) the original ROI array, (1.2) the colour compressed ROI array, (1.3) the associated full colour palette the colour compression model extracted from the gold set CAT_00_solid and used in compression, and (2) the colour profile of the examplery compressed ROI array (a relative frequency distribution of colour centroids, min freq > 0.01%).
+* picks one random ROI array from the CAT_01_rois.npy file created in (2) and runs the feature extraction steps; plots (1.1) the original ROI array, (1.2) the colour compressed ROI array, (1.3) the associated full colour palette the colour compression model extracted from the gold set CAT_00_solid and used in compression, and (2) the colour profile of the exemplary compressed ROI array (a relative frequency distribution of colour centroids, min freq > 0.01%).
 
 
 > § python cluster_cats.py -lim 100 -clst 4
@@ -70,10 +66,10 @@ Command line arguments are as follows; any arguments specified for the feature e
 
 ___
 
-Since preprocessing takes some time & relies on cv/cvlib which uses tensor flow, I have decided to supply the files for easy testing of code. Preprocessing was done using the commands and requires some more modules/files as detailed above.
+Since preprocessing takes some time & relies on cv/cvlib which uses tensor flow, I have decided to supply toy samples of the ROI files for easy testing of code. Preprocessing was done using these commands and requires some more modules/files as detailed above. To run the code yourself, uncomment the 'from ...import...' statement and second half of the get_rois() function in helper.py.
 
-1) > $ python preprocess_imgs.py  
+1) > $ python process_imgs.py  
 * handles extraction of ROI arrays for gold sets CAT_00_solid and CAT_00_mixed, saves these as .npy files 
 
-2) > $ python preprocess_imgs.py -srcdir ./cats/CAT_01 -lim 200
+2) > $ python process_imgs.py -srcdir ./cats/CAT_01 -lim 200
 * handles extraction of ROI arrays for the first 200 images in blind test set CAT_01, saves these as .npy files 
